@@ -491,12 +491,13 @@ begin
     A('  <cbc:DueDate>' + FormatDateTime('yyyy-mm-dd', DatumSplatnosti) + '</cbc:DueDate>');
     A('  <cbc:InvoiceTypeCode>380</cbc:InvoiceTypeCode>');
     A('  <cbc:DocumentCurrencyCode>' + XMLEscape(Mena) + '</cbc:DocumentCurrencyCode>');
-    // Peppol requires a buyer reference or purchase-order reference.
-    // Prefer the variable symbol from the DB; when it is empty, use the
-    // invoice number as a non-empty fallback for the current integration.
-    if VarSymbol = '' then
-      VarSymbol := IntToStr(CisloDokladu);
-    A('  <cbc:BuyerReference>' + XMLEscape(VarSymbol) + '</cbc:BuyerReference>');
+    // For now VAR_SYMBOL is used as Buyer Reference (BT-10).
+    // Do not invent a fallback value from the invoice number.
+    if Trim(VarSymbol) = '' then
+      raise Exception.Create(
+        'Vyplňte variabilný symbol (Buyer Reference) alebo číslo objednávky (PO). ' +
+        'Faktúru nie je možné odoslať.');
+    A('  <cbc:BuyerReference>' + XMLEscape(Trim(VarSymbol)) + '</cbc:BuyerReference>');
 
     // SUPPLIER
     A('  <cac:AccountingSupplierParty><cac:Party>');
