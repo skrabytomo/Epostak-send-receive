@@ -102,7 +102,7 @@ type
     function  F2(const V: Double): string;
     function  F4(const V: Double): string;
     function  NewGUID: string;
-    function  GenerujUBLInvoice(AIDDokladu: Integer; AIDSpolLic: Integer; const ASupplierParticipantId: string): string;
+    function  GenerujUBLInvoice(AIDDokladu: Integer; AIDSpolLic: Integer; const ASupplierParticipantId, AReceiverParticipantId: string): string;
   end;
 
 var
@@ -333,7 +333,7 @@ begin
   Result.Open;
 end;
 
-function TFormMain.GenerujUBLInvoice(AIDDokladu: Integer; AIDSpolLic: Integer; const ASupplierParticipantId: string): string;
+function TFormMain.GenerujUBLInvoice(AIDDokladu: Integer; AIDSpolLic: Integer; const ASupplierParticipantId, AReceiverParticipantId: string): string;
 var
   SB:        TStringList;
   Q:         TADOQuery;
@@ -350,6 +350,7 @@ var
   CenaCelkom:      Double;
   SupNazov, SupUlica, SupMesto, SupPSC, SupICO, SupDIC, SupIBAN: string;
   SupplierParticipantScheme, SupplierParticipantValue: string;
+  ReceiverParticipantScheme, ReceiverParticipantValue: string;
   P: Integer;
   CusNazov, CusUlica, CusMesto, CusPSC, CusICO, CusDIC:          string;
 
@@ -368,6 +369,16 @@ begin
   SupplierParticipantValue := Trim(SupplierParticipantValue);
   if SupplierParticipantValue = '' then
     raise Exception.Create('Neplatny Supplier Participant ID: ' + ASupplierParticipantId);
+
+  ReceiverParticipantValue := Trim(AReceiverParticipantId);
+  P := Pos(':', ReceiverParticipantValue);
+  if P <= 1 then
+    raise Exception.Create('Neplatny Receiver Participant ID: ' + AReceiverParticipantId);
+  ReceiverParticipantScheme := Copy(ReceiverParticipantValue, 1, P - 1);
+  Delete(ReceiverParticipantValue, 1, P);
+  ReceiverParticipantValue := Trim(ReceiverParticipantValue);
+  if ReceiverParticipantValue = '' then
+    raise Exception.Create('Neplatny Receiver Participant ID: ' + AReceiverParticipantId);
 
   SB := TStringList.Create;
   try
@@ -500,7 +511,8 @@ begin
 
     // CUSTOMER
     A('  <cac:AccountingCustomerParty><cac:Party>');
-    A('    <cbc:EndpointID schemeID="0196">' + XMLEscape(CusDIC) + '</cbc:EndpointID>');
+    A('    <cbc:EndpointID schemeID="' + XMLEscape(ReceiverParticipantScheme) + '">' +
+      XMLEscape(ReceiverParticipantValue) + '</cbc:EndpointID>');
     A('    <cac:PostalAddress>');
     A('      <cbc:StreetName>' + XMLEscape(CusUlica) + '</cbc:StreetName>');
     A('      <cbc:CityName>' + XMLEscape(CusMesto) + '</cbc:CityName>');
@@ -821,7 +833,8 @@ begin
   Log('Generujem UBL XML: faktura c.' + lvInvoices.Selected.Caption +
       ' | ' + lvInvoices.Selected.SubItems[2] + '...');
 
-  FLastXML := GenerujUBLInvoice(IDDokladu, IDSpolLic, Trim(edtParticipantId.Text));
+  FLastXML := GenerujUBLInvoice(IDDokladu, IDSpolLic,
+    Trim(edtParticipantId.Text), Trim(edtReceiverId.Text));
 
   if FLastXML = '' then
   begin
