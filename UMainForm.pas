@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
   StdCtrls, ComCtrls, ExtCtrls, IniFiles, FileCtrl, DB, ADODB,
-  EpostakClient, EpostakDemoCreds;
+  EpostakClient, EpostakDemoCreds, EpostakPeppolEAS;
 
 type
   TFARiadok = record
@@ -688,6 +688,25 @@ begin
 
   // Auto-connect to InTime DB on startup
   ConnectDB;
+  if (FDBConn <> nil) and FDBConn.Connected then
+  begin
+    try
+      EnsurePeppolEASTable(FDBConn);
+      if PeppolEASNeedsUpdate(FDBConn) then
+      begin
+        Log('Peppol EAS: aktualizujem ciselnik...');
+        var UpdatedCount: Integer;
+        if UpdatePeppolEAS(FDBConn, UpdatedCount) then
+          Log('Peppol EAS: aktualizovanych ' + IntToStr(UpdatedCount) + ' zaznamov.')
+        else
+          Log('Peppol EAS: aktualizacia sa nepodarila, pouzivam lokalny ciselnik.');
+      end
+      else
+        Log('Peppol EAS: lokalny ciselnik je aktualny.');
+    except
+      on E: Exception do Log('Peppol EAS: chyba aktualizacie - ' + E.Message);
+    end;
+  end;
 end;
 
 procedure TFormMain.FormDestroy(Sender: TObject);
