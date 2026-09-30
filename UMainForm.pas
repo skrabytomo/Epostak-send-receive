@@ -491,12 +491,53 @@ begin
     A('  <cbc:DueDate>' + FormatDateTime('yyyy-mm-dd', DatumSplatnosti) + '</cbc:DueDate>');
     A('  <cbc:InvoiceTypeCode>380</cbc:InvoiceTypeCode>');
     A('  <cbc:DocumentCurrencyCode>' + XMLEscape(Mena) + '</cbc:DocumentCurrencyCode>');
+    // Required data validation must happen before XML generation.
     // For now VAR_SYMBOL is used as Buyer Reference (BT-10).
-    // Do not invent a fallback value from the invoice number.
     if Trim(VarSymbol) = '' then
-      raise Exception.Create(
-        'Vyplňte variabilný symbol (Buyer Reference) alebo číslo objednávky (PO). ' +
-        'Faktúru nie je možné odoslať.');
+    begin
+      ShowMessage('Vyplnte variabilny symbol (Buyer Reference) alebo cislo objednavky (PO).' +
+        #13#10 + 'Fakturu nie je mozne odoslat.');
+      Exit;
+    end;
+
+    if Trim(Mena) = '' then
+    begin
+      ShowMessage('Fakturu nie je mozne odoslat: chyba mena faktury.');
+      Exit;
+    end;
+
+    if Trim(SupNazov) = '' then
+    begin
+      ShowMessage('Fakturu nie je mozne odoslat: chyba nazov dodavatela.');
+      Exit;
+    end;
+
+    if Trim(CusNazov) = '' then
+    begin
+      ShowMessage('Fakturu nie je mozne odoslat: chyba nazov odberatela.');
+      Exit;
+    end;
+
+    if DatumDokladu = 0 then
+    begin
+      ShowMessage('Fakturu nie je mozne odoslat: chyba datum vystavenia.');
+      Exit;
+    end;
+
+    if DatumSplatnosti = 0 then
+    begin
+      ShowMessage('Fakturu nie je mozne odoslat: chyba datum splatnosti.');
+      Exit;
+    end;
+
+    for i := 0 to High(Riadky) do
+      if Riadky[i].Mnozstvo = 0 then
+      begin
+        ShowMessage('Fakturu nie je mozne odoslat: riadok ' +
+          IntToStr(Riadky[i].PCRiadku) + ' ma nulove mnozstvo.');
+        Exit;
+      end;
+
     A('  <cbc:BuyerReference>' + XMLEscape(Trim(VarSymbol)) + '</cbc:BuyerReference>');
 
     // SUPPLIER
