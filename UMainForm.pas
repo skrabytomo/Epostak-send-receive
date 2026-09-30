@@ -491,9 +491,12 @@ begin
     A('  <cbc:DueDate>' + FormatDateTime('yyyy-mm-dd', DatumSplatnosti) + '</cbc:DueDate>');
     A('  <cbc:InvoiceTypeCode>380</cbc:InvoiceTypeCode>');
     A('  <cbc:DocumentCurrencyCode>' + XMLEscape(Mena) + '</cbc:DocumentCurrencyCode>');
-    // BuyerReference is optional, but if present it must not be empty.
-    if VarSymbol <> '' then
-      A('  <cbc:BuyerReference>' + XMLEscape(VarSymbol) + '</cbc:BuyerReference>');
+    // Peppol requires a buyer reference or purchase-order reference.
+    // Prefer the variable symbol from the DB; when it is empty, use the
+    // invoice number as a non-empty fallback for the current integration.
+    if VarSymbol = '' then
+      VarSymbol := IntToStr(CisloDokladu);
+    A('  <cbc:BuyerReference>' + XMLEscape(VarSymbol) + '</cbc:BuyerReference>');
 
     // SUPPLIER
     A('  <cac:AccountingSupplierParty><cac:Party>');
@@ -586,7 +589,14 @@ begin
       A('      </cac:ClassifiedTaxCategory>');
       A('    </cac:Item>');
       A('    <cac:Price>');
-      A('      <cbc:PriceAmount currencyID="' + Mena + '">' + F4(Riadky[i].CenaJedn) + '</cbc:PriceAmount>');
+      // R120: line net amount must match quantity * net unit price.
+      // The DB line amount is authoritative, so derive the unit price from
+      // that amount instead of using a separately rounded DB unit price.
+      if Riadky[i].Mnozstvo = 0 then
+        raise Exception.Create('Neplatne mnozstvo na riadku ' +
+          IntToStr(Riadky[i].PCRiadku) + ': 0');
+      A('      <cbc:PriceAmount currencyID="' + Mena + '">' +
+        F4(Riadky[i].CenaBezDPH / Riadky[i].Mnozstvo) + '</cbc:PriceAmount>');
       A('    </cac:Price>');
       A('  </cac:InvoiceLine>');
     end;
