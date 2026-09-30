@@ -156,12 +156,16 @@ end;
 
 function TFormMain.F2(const V: Double): string;
 begin
+  // Peppol/UBL xs:decimal requires a dot as decimal separator.
   Result := FloatToStrF(V, ffFixed, 10, 2);
+  Result := StringReplace(Result, DecimalSeparator, '.', [rfReplaceAll]);
 end;
 
 function TFormMain.F4(const V: Double): string;
 begin
+  // Peppol/UBL xs:decimal requires a dot as decimal separator.
   Result := FloatToStrF(V, ffFixed, 10, 4);
+  Result := StringReplace(Result, DecimalSeparator, '.', [rfReplaceAll]);
 end;
 
 function TFormMain.NewGUID: string;
@@ -487,7 +491,9 @@ begin
     A('  <cbc:DueDate>' + FormatDateTime('yyyy-mm-dd', DatumSplatnosti) + '</cbc:DueDate>');
     A('  <cbc:InvoiceTypeCode>380</cbc:InvoiceTypeCode>');
     A('  <cbc:DocumentCurrencyCode>' + XMLEscape(Mena) + '</cbc:DocumentCurrencyCode>');
-    A('  <cbc:BuyerReference>' + XMLEscape(VarSymbol) + '</cbc:BuyerReference>');
+    // BuyerReference is optional, but if present it must not be empty.
+    if VarSymbol <> '' then
+      A('  <cbc:BuyerReference>' + XMLEscape(VarSymbol) + '</cbc:BuyerReference>');
 
     // SUPPLIER
     A('  <cac:AccountingSupplierParty><cac:Party>');
@@ -568,7 +574,11 @@ begin
       A('    <cbc:InvoicedQuantity unitCode="' + MJToUnitCode(Riadky[i].MJ) + '">' + F4(Riadky[i].Mnozstvo) + '</cbc:InvoicedQuantity>');
       A('    <cbc:LineExtensionAmount currencyID="' + Mena + '">' + F2(Riadky[i].CenaBezDPH) + '</cbc:LineExtensionAmount>');
       A('    <cac:Item>');
-      A('      <cbc:Name>' + XMLEscape(Riadky[i].Text) + '</cbc:Name>');
+      // PEPPOL-EN16931-R008 requires Item/Name when an Item is present.
+      if Trim(Riadky[i].Text) <> '' then
+        A('      <cbc:Name>' + XMLEscape(Riadky[i].Text) + '</cbc:Name>')
+      else
+        A('      <cbc:Name>Polozka ' + IntToStr(Riadky[i].PCRiadku) + '</cbc:Name>');
       A('      <cac:ClassifiedTaxCategory>');
       A('        <cbc:ID>' + DPHTaxCategory(Riadky[i].DPHSadzba) + '</cbc:ID>');
       A('        <cbc:Percent>' + F2(Riadky[i].DPHSadzba) + '</cbc:Percent>');
