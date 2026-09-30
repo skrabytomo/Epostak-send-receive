@@ -6,8 +6,7 @@ uses
   Windows, SysUtils, StrUtils, Classes, ADODB, WinInet, ComObj;
 
 const
-  PEPPOL_EAS_SOURCE_URL =
-    'https://docs.peppol.eu/edelivery/codelists/v9.7/Peppol%20Code%20Lists%20-%20Participant%20identifier%20schemes%20v9.7.xml';
+  PEPPOL_EAS_INDEX_URL = 'https://docs.peppol.eu/edelivery/codelists/';
   PEPPOL_EAS_REFRESH_DAYS = 7;
 
 function EnsurePeppolEASTable(AConn: TADOConnection): Boolean;
@@ -20,6 +19,35 @@ implementation
 function SQLQuote(const S: string): string;
 begin
   Result := '''' + StringReplace(S, '''', '''''', [rfReplaceAll]) + '''';
+end;
+
+function GetLatestEASUrl: string;
+var
+  XML, Links, Link: OleVariant;
+  I: Integer;
+  Href: string;
+begin
+  Result := '';
+  XML := CreateOleObject('MSXML2.DOMDocument.6.0');
+  XML.async := False;
+  XML.validateOnParse := False;
+  if not XML.load(PEPPOL_EAS_INDEX_URL) then Exit;
+  Links := XML.selectNodes('//a[contains(@href, ''Participant%20identifier%20schemes'') and contains(@href, ''.xml'')]');
+  for I := 0 to Links.length - 1 do
+  begin
+    Link := Links.item(I);
+    Href := VarToStr(Link.getAttribute('href'));
+    if Href <> '' then
+    begin
+      if Pos('http', LowerCase(Href)) = 1 then
+        Result := Href
+      else if Href[1] = '/' then
+        Result := 'https://docs.peppol.eu' + Href
+      else
+        Result := 'https://docs.peppol.eu/edelivery/codelists/' + Href;
+      Exit;
+    end;
+  end;
 end;
 
 function DownloadTextFile(const AUrl, AFileName: string): Boolean;
@@ -112,7 +140,7 @@ end;
 
 function UpdatePeppolEAS(AConn: TADOConnection; out AUpdatedCount: Integer): Boolean;
 var
-  TempFile: string;
+  TempFile, SourceUrl, SourceVersion: string;
   XML, Rows, Row, N: OleVariant;
   I: Integer;
   SchemeId, Country, SchemeName, State, RemovalDate: string;
@@ -122,14 +150,18 @@ begin
   AUpdatedCount := 0;
   if not EnsurePeppolEASTable(AConn) then Exit;
 
+  SourceUrl := GetLatestEASUrl;
+  if SourceUrl = '' then Exit;
   TempFile := IncludeTrailingPathDelimiter(GetEnvironmentVariable('TEMP')) +
     'peppol-eas.xml';
-  if not DownloadTextFile(PEPPOL_EAS_SOURCE_URL, TempFile) then Exit;
+  if not DownloadTextFile(SourceUrl, TempFile) then Exit;
   try
     XML := CreateOleObject('MSXML2.DOMDocument.6.0');
     XML.async := False;
     XML.validateOnParse := False;
     if not XML.load(TempFile) then Exit;
+    SourceVersion := VarToStr(XML.documentElement.getAttribute('version'));
+    if SourceVersion = '' then SourceVersion := 'current';
 
     Rows := XML.selectNodes('//*[local-name()="Row"]');
     if Rows.length = 0 then Exit;
@@ -157,7 +189,7 @@ begin
             'STATE=' + SQLQuote(State) + ',' +
             'REMOVAL_DATE=' +
               IfThen(RemovalDate = '', 'NULL', SQLQuote(RemovalDate)) + ',' +
-            'SOURCE_VERSION=' + SQLQuote('9.7') + ',' +
+            'SOURCE_VERSION=' + SQLQuote(SourceVersion) + ',' +
             'UPDATED_AT=CURRENT_TIMESTAMP ' +
             'WHERE SCHEME_ID=' + SQLQuote(SchemeId);
           Q.ExecSQL;
@@ -172,7 +204,7 @@ begin
               SQLQuote(SchemeId) + ',' + SQLQuote(Country) + ',' +
               SQLQuote(SchemeName) + ',' + SQLQuote(State) + ',' +
               IfThen(RemovalDate = '', 'NULL', SQLQuote(RemovalDate)) + ',' +
-              SQLQuote('9.7') + ',CURRENT_TIMESTAMP)';
+              SQLQuote(SourceVersion) + ',CURRENT_TIMESTAMP)';
             Q.ExecSQL;
           end;
           Inc(AUpdatedCount);
