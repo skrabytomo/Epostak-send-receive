@@ -374,6 +374,13 @@ begin
   if SupplierParticipantValue = '' then
     raise Exception.Create('Neplatny Supplier Participant ID: ' + ASupplierParticipantId);
 
+  if (FDBConn <> nil) and FDBConn.Connected then
+  begin
+    EnsurePeppolEASTable(FDBConn);
+    if not PeppolEASIsActive(FDBConn, SupplierParticipantScheme) then
+      raise Exception.Create('Neplatne alebo neaktivne Supplier schemeID: ' + SupplierParticipantScheme);
+  end;
+
   ReceiverParticipantValue := Trim(AReceiverParticipantId);
   P := Pos(':', ReceiverParticipantValue);
   if P <= 1 then
@@ -383,6 +390,10 @@ begin
   ReceiverParticipantValue := Trim(ReceiverParticipantValue);
   if ReceiverParticipantValue = '' then
     raise Exception.Create('Neplatny Receiver Participant ID: ' + AReceiverParticipantId);
+
+  if (FDBConn <> nil) and FDBConn.Connected then
+    if not PeppolEASIsActive(FDBConn, ReceiverParticipantScheme) then
+      raise Exception.Create('Neplatne alebo neaktivne Receiver schemeID: ' + ReceiverParticipantScheme);
 
   SB := TStringList.Create;
   try
@@ -655,7 +666,7 @@ end;
 // ============================================================================
 
 procedure TFormMain.FormCreate(Sender: TObject);
-var Ini: TIniFile;
+var Ini: TIniFile; UpdatedCount: Integer;
 begin
   SetupColumns;
   FDBConn  := nil;
@@ -695,7 +706,6 @@ begin
       if PeppolEASNeedsUpdate(FDBConn) then
       begin
         Log('Peppol EAS: aktualizujem ciselnik...');
-        var UpdatedCount: Integer;
         if UpdatePeppolEAS(FDBConn, UpdatedCount) then
           Log('Peppol EAS: aktualizovanych ' + IntToStr(UpdatedCount) + ' zaznamov.')
         else
