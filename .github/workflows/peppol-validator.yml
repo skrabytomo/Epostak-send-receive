@@ -1,0 +1,24 @@
+name: Peppol validator
+
+on:
+  push:
+    paths:
+      - 'peppol-validator/**'
+      - 'build-validator.bat'
+  pull_request:
+    paths:
+      - 'peppol-validator/**'
+      - 'build-validator.bat'
+
+jobs:
+  build-validator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - name: Build validator
+        run: mvn -f peppol-validator/pom.xml -DskipTests clean package
