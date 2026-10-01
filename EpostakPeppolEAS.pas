@@ -3,14 +3,165 @@ unit EpostakPeppolEAS;
 interface
 
 uses
-  Windows, SysUtils, StrUtils, Classes, ADODB, WinInet, ComObj;
+  Windows, SysUtils, StrUtils, Classes, ADODB, WinInet, ComObj, Variants;
 
 const
   PEPPOL_EAS_INDEX_URL   = 'https://docs.peppol.eu/edelivery/codelists/';
   PEPPOL_EAS_REFRESH_DAYS = 7;
 
 function EnsurePeppolEASTable(AConn: TADOConnection): Boolean;
+function ParseISODate(const AValue: string; out ADate: TDateTime): Boolean;
+var
+  S: string;
+  Y, M, D: Word;
+begin
+  Result := False;
+  ADate := 0;
+  S := Trim(AValue);
+  if Length(S) <> 10 then Exit;
+  if (S[5] <> '-') or (S[8] <> '-') then Exit;
+  try
+    Y := StrToInt(Copy(S, 1, 4));
+    M := StrToInt(Copy(S, 6, 2));
+    D := StrToInt(Copy(S, 9, 2));
+    ADate := EncodeDate(Y, M, D);
+    Result := True;
+  except
+    Result := False;
+  end;
+end;
+
+function DateSQLLiteral(const AValue: string): string;
+var
+  D: TDateTime;
+begin
+  if Trim(AValue) = '' then
+  begin
+    Result := 'NULL';
+    Exit;
+  end;
+  if not ParseISODate(AValue, D) then
+    raise Exception.CreateFmt('Invalid Peppol EAS removal date: %s', [AValue]);
+  Result := 'DATE ' + SQLQuote(FormatDateTime('yyyy-mm-dd', D));
+end;
+
+function TableExists(AConn: TADOConnection): Boolean;
+var
+  Q: TADOQuery;
+begin
+  Result := False;
+  if (AConn = nil) or not AConn.Connected then Exit;
+  Q := TADOQuery.Create(nil);
+  try
+    Q.Connection := AConn;
+    Q.SQL.Text :=
+      'SELECT RDB$RELATION_NAME FROM RDB$RELATIONS ' +
+      'WHERE RDB$RELATION_NAME = ''PEPPOL_EAS''';
+    Q.Open;
+    Result := not Q.Eof;
+  finally
+    Q.Free;
+  end;
+end;
+
 function UpdatePeppolEAS(AConn: TADOConnection; out AUpdatedCount: Integer): Boolean;
+var
+  TempFile, SourceUrl, SourceVersion: string;
+  XML, Rows, Row, Root: OleVariant;
+  I: Integer;
+  SchemeId, Country, SchemeName, State, RemovalDate, DateLiteral: string;
+  Q: TADOQuery;
+begin
+  Result := False;
+  AUpdatedCount := 0;
+
+  if (AConn = nil) or not AConn.Connected then Exit;
+  if not TableExists(AConn) then Exit;
+
+  SourceUrl := GetLatestEASUrl;
+  if Trim(SourceUrl) = '' then Exit;
+
+  TempFile :=
+    IncludeTrailingPathDelimiter(GetEnvironmentVariable('TEMP')) +
+    Format('peppol-eas-%d.xml', [GetTickCount]);
+
+  if not DownloadTextFile(SourceUrl, TempFile) then Exit;
+
+  try
+    XML := CreateOleObject('MSXML2.DOMDocument.6.0');
+    XML.async := False;
+    XML.validateOnParse := False;
+    XML.resolveExternals := False;
+
+    if not XML.load(TempFile) then Exit;
+
+    Root := XML.documentElement;
+    if VarIsNull(Root) or VarIsEmpty(Root) then Exit;
+
+    Rows := XML.selectNodes('//*[local-name()="Row"]');
+    if Rows.length = 0 then Exit;
+
+    SourceVersion := VarToStr(Root.getAttribute('version'));
+    if Trim(SourceVersion) = '' then
+      SourceVersion := '9.7';
+
+    Q := TADOQuery.Create(nil);
+    try
+      Q.Connection := AConn;
+
+      AConn.BeginTrans;
+      try
+        Q.SQL.Text := 'DELETE FROM PEPPOL_EAS';
+        Q.ExecSQL;
+
+        for I := 0 to Rows.length - 1 do
+        begin
+          Row := Rows.item(I);
+          SchemeId := Trim(NodeValueByColumn(Row, 'iso6523'));
+          if SchemeId = '' then Continue;
+
+          Country := Trim(NodeValueByColumn(Row, 'country'));
+          SchemeName := Trim(NodeValueByColumn(Row, 'scheme-name'));
+          State := Trim(NodeValueByColumn(Row, 'state'));
+          RemovalDate := Trim(NodeValueByColumn(Row, 'removal-date'));
+          DateLiteral := DateSQLLiteral(RemovalDate);
+
+          Q.Close;
+          Q.SQL.Text :=
+            'INSERT INTO PEPPOL_EAS ' +
+            '(SCHEME_ID,COUNTRY_CODE,SCHEME_NAME,STATE,REMOVAL_DATE,' +
+            'SOURCE_VERSION,UPDATED_AT) VALUES (' +
+            SQLQuote(SchemeId) + ',' +
+            SQLQuote(Country) + ',' +
+            SQLQuote(SchemeName) + ',' +
+            SQLQuote(State) + ',' +
+            DateLiteral + ',' +
+            SQLQuote(SourceVersion) + ',CURRENT_TIMESTAMP)';
+          Q.ExecSQL;
+
+          Inc(AUpdatedCount);
+        end;
+
+        if AUpdatedCount = 0 then
+          raise Exception.Create(
+            'Peppol EAS XML contained no usable participant schemes.'
+          );
+
+        AConn.CommitTrans;
+      except
+        AConn.RollbackTrans;
+        raise;
+      end;
+
+      Result := True;
+    finally
+      Q.Free;
+    end;
+  finally
+    DeleteFile(TempFile);
+  end;
+end;
+
 function PeppolEASNeedsUpdate(AConn: TADOConnection): Boolean;
 function PeppolEASIsActive(AConn: TADOConnection; const ASchemeId: string): Boolean;
 
@@ -23,8 +174,7 @@ end;
 
 function GetLatestEASUrl: string;
 begin
-  // Direct URL to Peppol EAS codelist XML v9.7 (2026-07-02)
-  // Update this constant when OpenPeppol releases a new version
+  // Direct official OpenPeppol Genericode XML, not the HTML documentation page.
   Result := 'https://docs.peppol.eu/edelivery/codelists/v9.7/' +
     'Peppol%20Code%20Lists%20-%20Participant%20identifier%20schemes%20v9.7.xml';
 end;
@@ -32,17 +182,29 @@ end;
 function DownloadTextFile(const AUrl, AFileName: string): Boolean;
 var
   HInet, HUrl: HINTERNET;
-  Buf: array[0..4095] of Byte;
+  Buf: array[0..8191] of Byte;
   ReadBytes: DWORD;
   FS: TFileStream;
 begin
   Result := False;
-  HInet := InternetOpen('EpostakPeppolEAS/1.0', INTERNET_OPEN_TYPE_PRECONFIG, nil, nil, 0);
+  if Trim(AUrl) = '' then Exit;
+
+  HInet := InternetOpen(
+    'EpostakPeppolEAS/2.0',
+    INTERNET_OPEN_TYPE_PRECONFIG,
+    nil, nil, 0
+  );
   if HInet = nil then Exit;
+
   try
-    HUrl := InternetOpenUrl(HInet, PChar(AUrl), nil, 0,
-      INTERNET_FLAG_RELOAD or INTERNET_FLAG_NO_CACHE_WRITE, 0);
+    HUrl := InternetOpenUrl(
+      HInet, PChar(AUrl), nil, 0,
+      INTERNET_FLAG_RELOAD or
+      INTERNET_FLAG_NO_CACHE_WRITE or
+      INTERNET_FLAG_SECURE, 0
+    );
     if HUrl = nil then Exit;
+
     try
       FS := TFileStream.Create(AFileName, fmCreate);
       try
@@ -51,7 +213,7 @@ begin
           if not InternetReadFile(HUrl, @Buf[0], SizeOf(Buf), ReadBytes) then Exit;
           if ReadBytes > 0 then FS.WriteBuffer(Buf[0], ReadBytes);
         until ReadBytes = 0;
-        Result := True;
+        Result := FS.Size > 0;
       finally
         FS.Free;
       end;
@@ -231,6 +393,8 @@ begin
   Q := TADOQuery.Create(nil);
   try
     Q.Connection := AConn;
+    if not TableExists(AConn) then Exit;
+
     Q.SQL.Text := 'SELECT MAX(UPDATED_AT) AS LAST_UPDATE FROM PEPPOL_EAS';
     try
       Q.Open;
@@ -265,7 +429,7 @@ begin
     if Q.Eof then Exit;
     Result := SameText(Trim(Q.FieldByName('STATE').AsString), 'active') and
               (Q.FieldByName('REMOVAL_DATE').IsNull or
-               (Q.FieldByName('REMOVAL_DATE').AsDateTime > Date));
+               (Q.FieldByName('REMOVAL_DATE').AsDateTime >= Date));
   finally
     Q.Free;
   end;
