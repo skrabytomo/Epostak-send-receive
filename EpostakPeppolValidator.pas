@@ -3,7 +3,7 @@ unit EpostakPeppolValidator;
 interface
 
 uses
-  Windows, SysUtils, Classes, WinInet, ComObj, Variants;
+  Windows, SysUtils, StrUtils, Classes, WinInet, ComObj, Variants;
 
 type
   TPeppolValidationResult = record
