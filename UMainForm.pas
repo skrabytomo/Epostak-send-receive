@@ -858,6 +858,8 @@ procedure TFormMain.btnSendClick(Sender: TObject);
 var
   Client: TEpostakClient;
   UblXml, DocId: string;
+  V: TPeppolValidationResult;
+  VI: Integer;
 begin
   if Trim(edtBaseURL.Text) = '' then begin Log('CHYBA: Vyplnte Base URL.'); Exit; end;
   if Trim(edtParticipantId.Text) = '' then begin Log('CHYBA: Vyplnte Participant ID.'); Exit; end;
@@ -884,7 +886,6 @@ begin
   if Trim(UblXml) = '' then begin Log('CHYBA: XML je prazdny.'); Exit; end;
 
   // Fail-closed: dokument nesmie byt odoslany bez lokalnej Peppol validacie.
-  var V: TPeppolValidationResult;
   try
     Log('Spustam lokalnu Peppol validaciu...');
     if not ValidatePeppolXMLText(UblXml, V) then
@@ -901,7 +902,6 @@ begin
       Log('STOP: XML nepreslo Peppol validaciou (' + V.VES + ').');
       if V.Errors.Count > 0 then
       begin
-        var VI: Integer;
         for VI := 0 to V.Errors.Count - 1 do
           Log('  ' + V.Errors[VI]);
       end;
@@ -970,7 +970,11 @@ begin
 end;
 
 procedure TFormMain.btnDownloadSelectedClick(Sender: TObject);
-var Client: TEpostakClient; DocId, XML, SavePath: string;
+var
+  Client: TEpostakClient;
+  DocId, XML, SavePath: string;
+  V: TPeppolValidationResult;
+  VI: Integer;
 begin
   DocId := GetSelectedDocId;
   if DocId = '' then begin Log('Vyberte dokument.'); Exit; end;
@@ -983,7 +987,6 @@ begin
     SaveRawBytesToFile(SavePath, XML);
     Log('ULOZENE: ' + SavePath);
 
-    var V: TPeppolValidationResult;
     try
       if ValidatePeppolXMLFile(SavePath, V) then
       begin
@@ -992,7 +995,6 @@ begin
         else
         begin
           Log('VALIDACIA: CHYBA (' + V.VES + ').');
-          var VI: Integer;
           for VI := 0 to V.Errors.Count - 1 do
             Log('  ' + V.Errors[VI]);
         end;
