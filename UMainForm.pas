@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms, Dialogs,
   StdCtrls, ComCtrls, ExtCtrls, IniFiles, FileCtrl, DB, ADODB,
-  EpostakClient, EpostakDemoCreds, EpostakPeppolEAS;
+  EpostakClient, EpostakDemoCreds, EpostakPeppolEAS, EpostakPeppolValidator;
 
 type
   TFARiadok = record
@@ -600,6 +600,11 @@ begin
 
   dlgOpenXML.Filter := 'XML subory (*.xml)|*.xml|Vsetky (*.*)|*.*';
 
+  if PeppolValidatorAvailable then
+    Log('Peppol validator: pripraveny.')
+  else
+    Log('VAROVANIE: Peppol validator nie je pripraveny. Pred odoslanim zostavte peppol-validator.');
+
   // Auto-connect to InTime DB on startup
   ConnectDB;
 end;
@@ -878,6 +883,35 @@ begin
 
   if Trim(UblXml) = '' then begin Log('CHYBA: XML je prazdny.'); Exit; end;
 
+  // Fail-closed: dokument nesmie byt odoslany bez lokalnej Peppol validacie.
+  var V: TPeppolValidationResult;
+  try
+    Log('Spustam lokalnu Peppol validaciu...');
+    if not ValidatePeppolXMLText(UblXml, V) then
+    begin
+      if (V.Errors <> nil) and (V.Errors.Count > 0) then
+        Log('VALIDATOR CHYBA: ' + V.Errors[0])
+      else
+        Log('VALIDATOR CHYBA: validator nie je dostupny.');
+      Exit;
+    end;
+
+    if not V.Valid then
+    begin
+      Log('STOP: XML nepreslo Peppol validaciou (' + V.VES + ').');
+      if V.Errors.Count > 0 then
+      begin
+        var VI: Integer;
+        for VI := 0 to V.Errors.Count - 1 do
+          Log('  ' + V.Errors[VI]);
+      end;
+      Exit;
+    end;
+    Log('OK: XML preslo Peppol validaciou (' + V.VES + ').');
+  finally
+    FreePeppolValidationResult(V);
+  end;
+
   try
     Client := MakeClient;
   except
@@ -948,6 +982,26 @@ begin
     XML := Client.GetDocumentXML(DocId);
     SaveRawBytesToFile(SavePath, XML);
     Log('ULOZENE: ' + SavePath);
+
+    var V: TPeppolValidationResult;
+    try
+      if ValidatePeppolXMLFile(SavePath, V) then
+      begin
+        if V.Valid then
+          Log('VALIDACIA: OK (' + V.VES + ').')
+        else
+        begin
+          Log('VALIDACIA: CHYBA (' + V.VES + ').');
+          var VI: Integer;
+          for VI := 0 to V.Errors.Count - 1 do
+            Log('  ' + V.Errors[VI]);
+        end;
+      end
+      else if (V.Errors <> nil) and (V.Errors.Count > 0) then
+        Log('VALIDATOR CHYBA: ' + V.Errors[0]);
+    finally
+      FreePeppolValidationResult(V);
+    end;
   except
     on E: Exception do Log('CHYBA: ' + E.Message);
   end;
