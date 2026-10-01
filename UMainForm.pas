@@ -3,7 +3,7 @@ unit UMainForm;
 interface
 
 uses
-  Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
+  Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms, Dialogs,
   StdCtrls, ComCtrls, ExtCtrls, IniFiles, FileCtrl, DB, ADODB,
   EpostakClient, EpostakDemoCreds, EpostakPeppolEAS;
 
@@ -688,6 +688,8 @@ begin
 end;
 
 procedure TFormMain.ConnectDB;
+var
+  Updated: Integer;
 const
   DB_CONNSTR =
     'Driver={Firebird/InterBase(r) driver};' +
@@ -719,7 +721,6 @@ begin
       if PeppolEASNeedsUpdate(FDBConn) then
       begin
         Log('Aktualizujem Peppol EAS codelist...');
-        var Updated: Integer;
         if UpdatePeppolEAS(FDBConn, Updated) then
           Log('Peppol EAS: aktualizovanych ' + IntToStr(Updated) + ' schém.')
         else
