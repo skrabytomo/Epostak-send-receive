@@ -10,6 +10,7 @@ import com.helger.phive.api.result.ValidationResultList;
 import com.helger.phive.api.validity.IValidityDeterminator;
 import com.helger.phive.peppol.pint.PeppolValidationPint;
 import com.helger.phive.peppol.pint.PeppolValidationPintEU;
+import com.helger.phive.peppol.PeppolValidation2026_05;
 import com.helger.phive.xml.source.IValidationSourceXML;
 import com.helger.phive.xml.source.ValidationSourceXML;
 import com.helger.xml.serialize.read.DOMReader;
@@ -40,14 +41,25 @@ public final class Main {
       if(!file.isFile()){System.err.println("XML_FILE_NOT_FOUND");System.exit(3);}
       Document doc=DOMReader.readXMLDOM(file);
       if(doc==null||doc.getDocumentElement()==null){System.err.println("XML_PARSE_ERROR");System.exit(4);}
+      String customizationId="";
+      var cNodes=doc.getElementsByTagNameNS("urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2","CustomizationID");
+      if(cNodes.getLength()>0) customizationId=cNodes.item(0).getTextContent().trim();
       String root=doc.getDocumentElement().getLocalName();
       if(root==null||root.isEmpty()){root=doc.getDocumentElement().getNodeName();int p=root.indexOf(':');if(p>=0)root=root.substring(p+1);}
       if(!"invoice".equals(type)&&!"creditnote".equals(type)&&!"auto".equals(type)){System.err.println("INVALID_TYPE");System.exit(2);}
       if(!"Invoice".equalsIgnoreCase(root)&&!"CreditNote".equalsIgnoreCase(root)){System.err.println("UNSUPPORTED_DOCUMENT_ROOT="+root);System.exit(5);}
       boolean creditNote="creditnote".equals(type)||("auto".equals(type)&&"CreditNote".equalsIgnoreCase(root));
       ValidationExecutorSetRegistry<IValidationSourceXML> registry=new ValidationExecutorSetRegistry<>();
-      PeppolValidationPint.initPeppolPint(registry);
-      DVRCoordinate vesId=creditNote?PeppolValidationPintEU.VID_OPENPEPPOL_EU_PINT_CREDIT_NOTE_2026_6:PeppolValidationPintEU.VID_OPENPEPPOL_EU_PINT_INVOICE_2026_6;
+      DVRCoordinate vesId;
+      if(customizationId.startsWith("urn:peppol:pint:billing-1@eu-1")) {
+        PeppolValidationPint.initPeppolPint(registry);
+        vesId=creditNote?PeppolValidationPintEU.VID_OPENPEPPOL_EU_PINT_CREDIT_NOTE_2026_6:PeppolValidationPintEU.VID_OPENPEPPOL_EU_PINT_INVOICE_2026_6;
+      } else if(customizationId.indexOf("urn:fdc:peppol.eu:2017:poacc:billing:3.0")>=0) {
+        PeppolValidation2026_05.initBilling(registry);
+        vesId=creditNote?PeppolValidation2026_05.VID_OPENPEPPOL_CREDIT_NOTE_UBL_V3:PeppolValidation2026_05.VID_OPENPEPPOL_INVOICE_UBL_V3;
+      } else {
+        System.err.println("UNSUPPORTED_CUSTOMIZATION_ID="+customizationId); System.exit(7); return;
+      }
       IValidationExecutorSet<IValidationSourceXML> ves=registry.getOfID(vesId);
       if(ves==null){System.err.println("VES_NOT_FOUND="+vesId.getAsString());System.exit(6);}
       ValidationSourceXML source=ValidationSourceXML.create(file.getAbsolutePath(),doc);
