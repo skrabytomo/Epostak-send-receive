@@ -3,7 +3,7 @@ unit EpostakPeppolEAS;
 interface
 
 uses
-  Windows, SysUtils, Classes, ADODB, WinInet, ComObj, Variants;
+  Windows, SysUtils, StrUtils, Variants, Classes, ADODB, WinInet, ComObj;
 
 const
   PEPPOL_EAS_INDEX_URL = 'https://docs.peppol.eu/edelivery/codelists/';
@@ -23,6 +23,7 @@ end;
 
 function GetLatestEASUrl: string;
 begin
+  // Peppol Participant Identifier Schemes codelist XML v9.7
   Result := 'https://docs.peppol.eu/edelivery/codelists/v9.7/' +
     'Peppol%20Code%20Lists%20-%20Participant%20identifier%20schemes%20v9.7.xml';
 end;
