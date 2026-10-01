@@ -76,8 +76,13 @@ begin
 end;
 
 function PeppolValidatorAvailable: Boolean;
+var
+  JavaExe: string;
+  Buffer: array[0..MAX_PATH - 1] of Char;
 begin
-  Result := (FindValidatorJar <> '') and (FindJavaExe <> '');
+  JavaExe := FindJavaExe;
+  Result := (FindValidatorJar <> '') and
+            (SearchPath(nil, PChar(JavaExe), nil, SizeOf(Buffer), Buffer, nil) > 0);
 end;
 
 function QuoteArg(const S: string): string;
@@ -189,6 +194,26 @@ begin
   end;
 end;
 
+function JsonIntAfter(const AJSON, AName: string; AStart: Integer): Integer;
+var
+  P, StartPos, EndPos: Integer;
+  Search: string;
+begin
+  Result := 0;
+  Search := '"' + AName + '"';
+  P := PosEx(Search, AJSON, AStart);
+  if P = 0 then Exit;
+  P := P + Length(Search);
+  while (P <= Length(AJSON)) and (AJSON[P] <> ':') do Inc(P);
+  if P > Length(AJSON) then Exit;
+  Inc(P);
+  while (P <= Length(AJSON)) and (AJSON[P] in [' ', #9, #10, #13]) do Inc(P);
+  StartPos := P;
+  EndPos := P;
+  while (EndPos <= Length(AJSON)) and (AJSON[EndPos] in ['0'..'9', '-']) do Inc(EndPos);
+  Result := StrToIntDef(Copy(AJSON, StartPos, EndPos - StartPos), 0);
+end;
+
 function JsonStringAfter(const AJSON, AName: string; AStart: Integer): string;
 var
   P, StartPos, EndPos: Integer;
@@ -274,8 +299,7 @@ begin
   S := Copy(Output, P, MaxInt);
   AResult.Valid := Pos('"valid":true', S) > 0;
   AResult.VES := JsonStringAfter(S, 'ves', 1);
-  AResult.ErrorCount := StrToIntDef(
-    JsonStringAfter(S, 'errorCount', 1), 0);
+  AResult.ErrorCount := JsonIntAfter(S, 'errorCount', 1);
 
   I := 1;
   while True do
