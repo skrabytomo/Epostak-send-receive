@@ -721,10 +721,15 @@ begin
       if PeppolEASNeedsUpdate(FDBConn) then
       begin
         Log('Aktualizujem Peppol EAS codelist...');
-        if UpdatePeppolEAS(FDBConn, Updated) then
-          Log('Peppol EAS: aktualizovanych ' + IntToStr(Updated) + ' schém.')
-        else
-          Log('Peppol EAS: aktualizacia zlyhala (pokracujem).');
+        try
+          if UpdatePeppolEAS(FDBConn, Updated) then
+            Log('Peppol EAS: aktualizovanych ' + IntToStr(Updated) + ' schém.')
+          else
+            Log('Peppol EAS: aktualizacia zlyhala — GetLatestEASUrl vrátila prázdny URL alebo download zlyhal.');
+        except
+          on E: Exception do
+            Log('Peppol EAS update exception: ' + E.ClassName + ': ' + E.Message);
+        end;
       end
       else
         Log('Peppol EAS: codelist je aktualny.');

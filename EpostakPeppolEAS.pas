@@ -22,32 +22,11 @@ begin
 end;
 
 function GetLatestEASUrl: string;
-var
-  XML, Links, Link: OleVariant;
-  I: Integer;
-  Href: string;
 begin
-  Result := '';
-  XML := CreateOleObject('MSXML2.DOMDocument.6.0');
-  XML.async := False;
-  XML.validateOnParse := False;
-  if not XML.load(PEPPOL_EAS_INDEX_URL) then Exit;
-  Links := XML.selectNodes('//a[contains(@href, ''Participant%20identifier%20schemes'') and contains(@href, ''.xml'')]');
-  for I := 0 to Links.length - 1 do
-  begin
-    Link := Links.item(I);
-    Href := VarToStr(Link.getAttribute('href'));
-    if Href <> '' then
-    begin
-      if Pos('http', LowerCase(Href)) = 1 then
-        Result := Href
-      else if Href[1] = '/' then
-        Result := 'https://docs.peppol.eu' + Href
-      else
-        Result := 'https://docs.peppol.eu/edelivery/codelists/' + Href;
-      Exit;
-    end;
-  end;
+  // Direct URL to Peppol EAS codelist XML v9.7 (2026-07-02)
+  // Update this constant when OpenPeppol releases a new version
+  Result := 'https://docs.peppol.eu/edelivery/codelists/v9.7/' +
+    'Peppol%20Code%20Lists%20-%20Participant%20identifier%20schemes%20v9.7.xml';
 end;
 
 function DownloadTextFile(const AUrl, AFileName: string): Boolean;
