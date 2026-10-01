@@ -6,7 +6,7 @@ uses
   Windows, SysUtils, StrUtils, Classes, ADODB, WinInet, ComObj;
 
 const
-  PEPPOL_EAS_INDEX_URL = 'https://docs.peppol.eu/edelivery/codelists/';
+  PEPPOL_EAS_INDEX_URL   = 'https://docs.peppol.eu/edelivery/codelists/';
   PEPPOL_EAS_REFRESH_DAYS = 7;
 
 function EnsurePeppolEASTable(AConn: TADOConnection): Boolean;
@@ -148,18 +148,36 @@ var
 begin
   Result := False;
   AUpdatedCount := 0;
-  if not EnsurePeppolEASTable(AConn) then Exit;
+
+  // Only update if table exists — do NOT create it here
+  Q := TADOQuery.Create(nil);
+  try
+    Q.Connection := AConn;
+    Q.SQL.Text :=
+      'SELECT RDB$RELATION_NAME FROM RDB$RELATIONS ' +
+      'WHERE RDB$RELATION_NAME = ''PEPPOL_EAS''';
+    Q.Open;
+    if Q.Eof then
+    begin
+      // Table doesn't exist — skip silently
+      Exit;
+    end;
+  finally
+    Q.Free;
+  end;
 
   SourceUrl := GetLatestEASUrl;
   if SourceUrl = '' then Exit;
-  TempFile := IncludeTrailingPathDelimiter(GetEnvironmentVariable('TEMP')) +
-    'peppol-eas.xml';
+
+  TempFile := IncludeTrailingPathDelimiter(GetEnvironmentVariable('TEMP')) + 'peppol-eas.xml';
   if not DownloadTextFile(SourceUrl, TempFile) then Exit;
+
   try
     XML := CreateOleObject('MSXML2.DOMDocument.6.0');
     XML.async := False;
     XML.validateOnParse := False;
     if not XML.load(TempFile) then Exit;
+
     SourceVersion := VarToStr(XML.documentElement.getAttribute('version'));
     if SourceVersion = '' then SourceVersion := 'current';
 
@@ -174,35 +192,36 @@ begin
         for I := 0 to Rows.length - 1 do
         begin
           Row := Rows.item(I);
-          SchemeId := Trim(NodeValueByColumn(Row, 'iso6523'));
+          SchemeId    := Trim(NodeValueByColumn(Row, 'iso6523'));
           if SchemeId = '' then Continue;
-
-          Country := Trim(NodeValueByColumn(Row, 'country'));
-          SchemeName := Trim(NodeValueByColumn(Row, 'scheme-name'));
-          State := Trim(NodeValueByColumn(Row, 'state'));
+          Country     := Trim(NodeValueByColumn(Row, 'country'));
+          SchemeName  := Trim(NodeValueByColumn(Row, 'scheme-name'));
+          State       := Trim(NodeValueByColumn(Row, 'state'));
           RemovalDate := Trim(NodeValueByColumn(Row, 'removal-date'));
 
           Q.Close;
-          Q.SQL.Text := 'UPDATE PEPPOL_EAS SET ' +
-            'COUNTRY_CODE=' + SQLQuote(Country) + ',' +
-            'SCHEME_NAME=' + SQLQuote(SchemeName) + ',' +
-            'STATE=' + SQLQuote(State) + ',' +
-            'REMOVAL_DATE=' +
-              IfThen(RemovalDate = '', 'NULL', SQLQuote(RemovalDate)) + ',' +
-            'SOURCE_VERSION=' + SQLQuote(SourceVersion) + ',' +
+          Q.SQL.Text :=
+            'UPDATE PEPPOL_EAS SET ' +
+            'COUNTRY_CODE='     + SQLQuote(Country)      + ',' +
+            'SCHEME_NAME='      + SQLQuote(SchemeName)   + ',' +
+            'STATE='            + SQLQuote(State)         + ',' +
+            'REMOVAL_DATE='     + IfThen(RemovalDate = '', 'NULL', SQLQuote(RemovalDate)) + ',' +
+            'SOURCE_VERSION='   + SQLQuote(SourceVersion) + ',' +
             'UPDATED_AT=CURRENT_TIMESTAMP ' +
-            'WHERE SCHEME_ID=' + SQLQuote(SchemeId);
+            'WHERE SCHEME_ID='  + SQLQuote(SchemeId);
           Q.ExecSQL;
 
           N := Q.RowsAffected;
           if N = 0 then
           begin
             Q.Close;
-            Q.SQL.Text := 'INSERT INTO PEPPOL_EAS ' +
-              '(SCHEME_ID,COUNTRY_CODE,SCHEME_NAME,STATE,REMOVAL_DATE,' +
-              'SOURCE_VERSION,UPDATED_AT) VALUES (' +
-              SQLQuote(SchemeId) + ',' + SQLQuote(Country) + ',' +
-              SQLQuote(SchemeName) + ',' + SQLQuote(State) + ',' +
+            Q.SQL.Text :=
+              'INSERT INTO PEPPOL_EAS ' +
+              '(SCHEME_ID,COUNTRY_CODE,SCHEME_NAME,STATE,REMOVAL_DATE,SOURCE_VERSION,UPDATED_AT) VALUES (' +
+              SQLQuote(SchemeId)    + ',' +
+              SQLQuote(Country)     + ',' +
+              SQLQuote(SchemeName)  + ',' +
+              SQLQuote(State)       + ',' +
               IfThen(RemovalDate = '', 'NULL', SQLQuote(RemovalDate)) + ',' +
               SQLQuote(SourceVersion) + ',CURRENT_TIMESTAMP)';
             Q.ExecSQL;
@@ -237,7 +256,7 @@ begin
     try
       Q.Open;
     except
-      Exit;
+      Exit; // table doesn't exist
     end;
     if Q.Eof or Q.FieldByName('LAST_UPDATE').IsNull then Exit;
     D := Q.FieldByName('LAST_UPDATE').AsDateTime;
@@ -266,8 +285,8 @@ begin
     end;
     if Q.Eof then Exit;
     Result := SameText(Trim(Q.FieldByName('STATE').AsString), 'active') and
-      (Q.FieldByName('REMOVAL_DATE').IsNull or
-       (Q.FieldByName('REMOVAL_DATE').AsDateTime > Date));
+              (Q.FieldByName('REMOVAL_DATE').IsNull or
+               (Q.FieldByName('REMOVAL_DATE').AsDateTime > Date));
   finally
     Q.Free;
   end;

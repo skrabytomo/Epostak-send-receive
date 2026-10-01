@@ -102,7 +102,7 @@ type
     function  F2(const V: Double): string;
     function  F4(const V: Double): string;
     function  NewGUID: string;
-    function  GenerujUBLInvoice(AIDDokladu: Integer; AIDSpolLic: Integer; const ASupplierParticipantId, AReceiverParticipantId: string): string;
+    function  GenerujUBLInvoice(AIDDokladu: Integer; AIDSpolLic: Integer): string;
   end;
 
 var
@@ -156,16 +156,12 @@ end;
 
 function TFormMain.F2(const V: Double): string;
 begin
-  // Peppol/UBL xs:decimal requires a dot as decimal separator.
   Result := FloatToStrF(V, ffFixed, 10, 2);
-  Result := StringReplace(Result, DecimalSeparator, '.', [rfReplaceAll]);
 end;
 
 function TFormMain.F4(const V: Double): string;
 begin
-  // Peppol/UBL xs:decimal requires a dot as decimal separator.
   Result := FloatToStrF(V, ffFixed, 10, 4);
-  Result := StringReplace(Result, DecimalSeparator, '.', [rfReplaceAll]);
 end;
 
 function TFormMain.NewGUID: string;
@@ -337,7 +333,7 @@ begin
   Result.Open;
 end;
 
-function TFormMain.GenerujUBLInvoice(AIDDokladu: Integer; AIDSpolLic: Integer; const ASupplierParticipantId, AReceiverParticipantId: string): string;
+function TFormMain.GenerujUBLInvoice(AIDDokladu: Integer; AIDSpolLic: Integer): string;
 var
   SB:        TStringList;
   Q:         TADOQuery;
@@ -353,9 +349,6 @@ var
   DPHSuma:         Double;
   CenaCelkom:      Double;
   SupNazov, SupUlica, SupMesto, SupPSC, SupICO, SupDIC, SupIBAN: string;
-  SupplierParticipantScheme, SupplierParticipantValue: string;
-  ReceiverParticipantScheme, ReceiverParticipantValue: string;
-  P: Integer;
   CusNazov, CusUlica, CusMesto, CusPSC, CusICO, CusDIC:          string;
 
   procedure A(const S: string);
@@ -363,38 +356,6 @@ var
 
 begin
   Result := '';
-
-  SupplierParticipantValue := Trim(ASupplierParticipantId);
-  P := Pos(':', SupplierParticipantValue);
-  if P <= 1 then
-    raise Exception.Create('Neplatny Supplier Participant ID: ' + ASupplierParticipantId);
-  SupplierParticipantScheme := Copy(SupplierParticipantValue, 1, P - 1);
-  Delete(SupplierParticipantValue, 1, P);
-  SupplierParticipantValue := Trim(SupplierParticipantValue);
-  if SupplierParticipantValue = '' then
-    raise Exception.Create('Neplatny Supplier Participant ID: ' + ASupplierParticipantId);
-
-  if (FDBConn <> nil) and FDBConn.Connected then
-  begin
-    EnsurePeppolEASTable(FDBConn);
-    if not PeppolEASIsActive(FDBConn, SupplierParticipantScheme) then
-      raise Exception.Create('Neplatne alebo neaktivne Supplier schemeID: ' + SupplierParticipantScheme);
-  end;
-
-  ReceiverParticipantValue := Trim(AReceiverParticipantId);
-  P := Pos(':', ReceiverParticipantValue);
-  if P <= 1 then
-    raise Exception.Create('Neplatny Receiver Participant ID: ' + AReceiverParticipantId);
-  ReceiverParticipantScheme := Copy(ReceiverParticipantValue, 1, P - 1);
-  Delete(ReceiverParticipantValue, 1, P);
-  ReceiverParticipantValue := Trim(ReceiverParticipantValue);
-  if ReceiverParticipantValue = '' then
-    raise Exception.Create('Neplatny Receiver Participant ID: ' + AReceiverParticipantId);
-
-  if (FDBConn <> nil) and FDBConn.Connected then
-    if not PeppolEASIsActive(FDBConn, ReceiverParticipantScheme) then
-      raise Exception.Create('Neplatne alebo neaktivne Receiver schemeID: ' + ReceiverParticipantScheme);
-
   SB := TStringList.Create;
   try
     // --- HLAVICKA + CUSTOMER ---
@@ -502,59 +463,12 @@ begin
     A('  <cbc:DueDate>' + FormatDateTime('yyyy-mm-dd', DatumSplatnosti) + '</cbc:DueDate>');
     A('  <cbc:InvoiceTypeCode>380</cbc:InvoiceTypeCode>');
     A('  <cbc:DocumentCurrencyCode>' + XMLEscape(Mena) + '</cbc:DocumentCurrencyCode>');
-    // Required data validation must happen before XML generation.
-    // For now VAR_SYMBOL is used as Buyer Reference (BT-10).
-    if Trim(VarSymbol) = '' then
-    begin
-      ShowMessage('Vyplnte variabilny symbol (Buyer Reference) alebo cislo objednavky (PO).' +
-        #13#10 + 'Fakturu nie je mozne odoslat.');
-      Exit;
-    end;
-
-    if Trim(Mena) = '' then
-    begin
-      ShowMessage('Fakturu nie je mozne odoslat: chyba mena faktury.');
-      Exit;
-    end;
-
-    if Trim(SupNazov) = '' then
-    begin
-      ShowMessage('Fakturu nie je mozne odoslat: chyba nazov dodavatela.');
-      Exit;
-    end;
-
-    if Trim(CusNazov) = '' then
-    begin
-      ShowMessage('Fakturu nie je mozne odoslat: chyba nazov odberatela.');
-      Exit;
-    end;
-
-    if DatumDokladu = 0 then
-    begin
-      ShowMessage('Fakturu nie je mozne odoslat: chyba datum vystavenia.');
-      Exit;
-    end;
-
-    if DatumSplatnosti = 0 then
-    begin
-      ShowMessage('Fakturu nie je mozne odoslat: chyba datum splatnosti.');
-      Exit;
-    end;
-
-    for i := 0 to High(Riadky) do
-      if Riadky[i].Mnozstvo = 0 then
-      begin
-        ShowMessage('Fakturu nie je mozne odoslat: riadok ' +
-          IntToStr(Riadky[i].PCRiadku) + ' ma nulove mnozstvo.');
-        Exit;
-      end;
-
-    A('  <cbc:BuyerReference>' + XMLEscape(Trim(VarSymbol)) + '</cbc:BuyerReference>');
+    A('  <cbc:BuyerReference>' + XMLEscape(VarSymbol) + '</cbc:BuyerReference>');
 
     // SUPPLIER
     A('  <cac:AccountingSupplierParty><cac:Party>');
-    A('    <cbc:EndpointID schemeID="' + XMLEscape(SupplierParticipantScheme) + '">' +
-      XMLEscape(SupplierParticipantValue) + '</cbc:EndpointID>');
+    A('    <cbc:EndpointID schemeID="' + Copy(edtParticipantId.Text, 1, 4) + '">' +
+        XMLEscape(Copy(edtParticipantId.Text, 6, 255)) + '</cbc:EndpointID>');
     A('    <cac:PostalAddress>');
     A('      <cbc:StreetName>' + XMLEscape(SupUlica) + '</cbc:StreetName>');
     A('      <cbc:CityName>' + XMLEscape(SupMesto) + '</cbc:CityName>');
@@ -573,8 +487,8 @@ begin
 
     // CUSTOMER
     A('  <cac:AccountingCustomerParty><cac:Party>');
-    A('    <cbc:EndpointID schemeID="' + XMLEscape(ReceiverParticipantScheme) + '">' +
-      XMLEscape(ReceiverParticipantValue) + '</cbc:EndpointID>');
+    A('    <cbc:EndpointID schemeID="' + Copy(edtReceiverId.Text, 1, 4) + '">' +
+        XMLEscape(Copy(edtReceiverId.Text, 6, 255)) + '</cbc:EndpointID>');
     A('    <cac:PostalAddress>');
     A('      <cbc:StreetName>' + XMLEscape(CusUlica) + '</cbc:StreetName>');
     A('      <cbc:CityName>' + XMLEscape(CusMesto) + '</cbc:CityName>');
@@ -630,11 +544,7 @@ begin
       A('    <cbc:InvoicedQuantity unitCode="' + MJToUnitCode(Riadky[i].MJ) + '">' + F4(Riadky[i].Mnozstvo) + '</cbc:InvoicedQuantity>');
       A('    <cbc:LineExtensionAmount currencyID="' + Mena + '">' + F2(Riadky[i].CenaBezDPH) + '</cbc:LineExtensionAmount>');
       A('    <cac:Item>');
-      // PEPPOL-EN16931-R008 requires Item/Name when an Item is present.
-      if Trim(Riadky[i].Text) <> '' then
-        A('      <cbc:Name>' + XMLEscape(Riadky[i].Text) + '</cbc:Name>')
-      else
-        A('      <cbc:Name>Polozka ' + IntToStr(Riadky[i].PCRiadku) + '</cbc:Name>');
+      A('      <cbc:Name>' + XMLEscape(Riadky[i].Text) + '</cbc:Name>');
       A('      <cac:ClassifiedTaxCategory>');
       A('        <cbc:ID>' + DPHTaxCategory(Riadky[i].DPHSadzba) + '</cbc:ID>');
       A('        <cbc:Percent>' + F2(Riadky[i].DPHSadzba) + '</cbc:Percent>');
@@ -642,14 +552,7 @@ begin
       A('      </cac:ClassifiedTaxCategory>');
       A('    </cac:Item>');
       A('    <cac:Price>');
-      // R120: line net amount must match quantity * net unit price.
-      // The DB line amount is authoritative, so derive the unit price from
-      // that amount instead of using a separately rounded DB unit price.
-      if Riadky[i].Mnozstvo = 0 then
-        raise Exception.Create('Neplatne mnozstvo na riadku ' +
-          IntToStr(Riadky[i].PCRiadku) + ': 0');
-      A('      <cbc:PriceAmount currencyID="' + Mena + '">' +
-        F4(Riadky[i].CenaBezDPH / Riadky[i].Mnozstvo) + '</cbc:PriceAmount>');
+      A('      <cbc:PriceAmount currencyID="' + Mena + '">' + F4(Riadky[i].CenaJedn) + '</cbc:PriceAmount>');
       A('    </cac:Price>');
       A('  </cac:InvoiceLine>');
     end;
@@ -666,7 +569,7 @@ end;
 // ============================================================================
 
 procedure TFormMain.FormCreate(Sender: TObject);
-var Ini: TIniFile; UpdatedCount: Integer;
+var Ini: TIniFile;
 begin
   SetupColumns;
   FDBConn  := nil;
@@ -699,24 +602,6 @@ begin
 
   // Auto-connect to InTime DB on startup
   ConnectDB;
-  if (FDBConn <> nil) and FDBConn.Connected then
-  begin
-    try
-      EnsurePeppolEASTable(FDBConn);
-      if PeppolEASNeedsUpdate(FDBConn) then
-      begin
-        Log('Peppol EAS: aktualizujem ciselnik...');
-        if UpdatePeppolEAS(FDBConn, UpdatedCount) then
-          Log('Peppol EAS: aktualizovanych ' + IntToStr(UpdatedCount) + ' zaznamov.')
-        else
-          Log('Peppol EAS: aktualizacia sa nepodarila, pouzivam lokalny ciselnik.');
-      end
-      else
-        Log('Peppol EAS: lokalny ciselnik je aktualny.');
-    except
-      on E: Exception do Log('Peppol EAS: chyba aktualizacie - ' + E.Message);
-    end;
-  end;
 end;
 
 procedure TFormMain.FormDestroy(Sender: TObject);
@@ -828,6 +713,24 @@ begin
     FDBConn.Open;
     Log('OK: Pripojeny k 192.168.1.15:C:\Dochadzka.NET\DOCHADZKA.GDB');
     btnConnectDB.Caption := 'Pripojeny';
+
+    // Update Peppol EAS codelist if needed
+    try
+      if PeppolEASNeedsUpdate(FDBConn) then
+      begin
+        Log('Aktualizujem Peppol EAS codelist...');
+        var Updated: Integer;
+        if UpdatePeppolEAS(FDBConn, Updated) then
+          Log('Peppol EAS: aktualizovanych ' + IntToStr(Updated) + ' schém.')
+        else
+          Log('Peppol EAS: aktualizacia zlyhala (pokracujem).');
+      end
+      else
+        Log('Peppol EAS: codelist je aktualny.');
+    except
+      on E: Exception do
+        Log('Peppol EAS warning: ' + E.Message);
+    end;
   except
     on E: Exception do
     begin
@@ -924,8 +827,7 @@ begin
   Log('Generujem UBL XML: faktura c.' + lvInvoices.Selected.Caption +
       ' | ' + lvInvoices.Selected.SubItems[2] + '...');
 
-  FLastXML := GenerujUBLInvoice(IDDokladu, IDSpolLic,
-    Trim(edtParticipantId.Text), Trim(edtReceiverId.Text));
+  FLastXML := GenerujUBLInvoice(IDDokladu, IDSpolLic);
 
   if FLastXML = '' then
   begin
