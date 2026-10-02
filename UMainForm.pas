@@ -4,7 +4,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms, Dialogs,
-  StdCtrls, ComCtrls, ExtCtrls, IniFiles, {$WARN UNIT_PLATFORM OFF} FileCtrl, {$WARN UNIT_PLATFORM ON} DB, ADODB,
+  StdCtrls, ComCtrls, ExtCtrls, IniFiles, FileCtrl, DB, ADODB,
   EpostakClient, EpostakDemoCreds, EpostakPeppolEAS, EpostakPeppolValidator;
 
 type
