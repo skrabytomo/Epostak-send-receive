@@ -3,7 +3,7 @@ unit EpostakPeppolValidator;
 interface
 
 uses
-  Windows, SysUtils, StrUtils, Classes, WinInet, ComObj, Variants;
+  Windows, SysUtils, Classes, WinInet, ComObj, Variants;
 
 type
   TPeppolValidationResult = record
@@ -157,6 +157,24 @@ begin
   end;
 end;
 
+function PosFrom(const SubStr, S: string; StartPos: Integer): Integer;
+var
+  P: Integer;
+  Tail: string;
+begin
+  Result := 0;
+  if (StartPos < 1) or (StartPos > Length(S)) then Exit;
+  if SubStr = '' then
+  begin
+    Result := StartPos;
+    Exit;
+  end;
+  Tail := Copy(S, StartPos, Length(S) - StartPos + 1);
+  P := Pos(SubStr, Tail);
+  if P > 0 then
+    Result := StartPos + P - 1;
+end;
+
 function JsonUnescape(const S: string): string;
 var
   I: Integer;
@@ -166,7 +184,7 @@ begin
   I := 1;
   while I <= Length(S) do
   begin
-    if (S[I] = '') and (I < Length(S)) then
+    if (S[I] = '\\') and (I < Length(S)) then
     begin
       Inc(I);
       case S[I] of
@@ -204,7 +222,7 @@ var
 begin
   Result := 0;
   Search := '"' + AName + '"';
-  P := PosEx(Search, AJSON, AStart);
+  P := PosFrom(Search, AJSON, AStart);
   if P = 0 then Exit;
   P := P + Length(Search);
   while (P <= Length(AJSON)) and (AJSON[P] <> ':') do Inc(P);
@@ -237,7 +255,7 @@ begin
   while EndPos <= Length(AJSON) do
   begin
     if (AJSON[EndPos] = '"') and
-       ((EndPos = StartPos) or (AJSON[EndPos - 1] <> '')) then Break;
+       ((EndPos = StartPos) or (AJSON[EndPos - 1] <> '\\')) then Break;
     Inc(EndPos);
   end;
   if EndPos <= Length(AJSON) then
@@ -307,9 +325,8 @@ begin
   I := 1;
   while True do
   begin
-    P := PosEx('"message":"', S, I);
+    P := PosFrom('"message":"', S, I);
     if P = 0 then Break;
-    S := S; // keep compiler-compatible with old Delphi
     AResult.Errors.Add(JsonStringAfter(Copy(Output, P, MaxInt), 'message', 1));
     I := P + 10;
   end;
