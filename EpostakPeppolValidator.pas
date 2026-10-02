@@ -25,7 +25,7 @@ implementation
 function FindValidatorJar: string;
 var
   Candidates: TStringList;
-  I, P: Integer;
+  I: Integer;
   EnvJar, Base: string;
 begin
   Result := '';
@@ -102,7 +102,6 @@ var
   Buffer: array[0..4095] of Byte;
   ReadBytes: DWORD;
   Cmd: string;
-  H: THandle;
 begin
   Result := False;
   AOutput := '';
@@ -182,7 +181,7 @@ begin
             if I + 4 <= Length(S) then
             begin
               Hex := Copy(S, I + 1, 4);
-              Result := Result + WideChar(StrToIntDef('$' + Hex, Ord('?')));
+              Result := Result + Char(StrToIntDef('$' + Hex, Ord('?')));
               Inc(I, 4);
             end;
           end;
