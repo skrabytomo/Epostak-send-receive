@@ -79,10 +79,12 @@ function PeppolValidatorAvailable: Boolean;
 var
   JavaExe: string;
   Buffer: array[0..MAX_PATH - 1] of Char;
+  FilePart: PChar;
 begin
   JavaExe := FindJavaExe;
+  FilePart := nil;
   Result := (FindValidatorJar <> '') and
-            (SearchPath(nil, PChar(JavaExe), nil, SizeOf(Buffer), Buffer, nil) > 0);
+            (SearchPath(nil, PChar(JavaExe), nil, SizeOf(Buffer), Buffer, FilePart) > 0);
 end;
 
 function QuoteArg(const S: string): string;
@@ -163,12 +165,12 @@ begin
   I := 1;
   while I <= Length(S) do
   begin
-    if (S[I] = '') and (I < Length(S)) then
+    if (S[I] = '\\') and (I < Length(S)) then
     begin
       Inc(I);
       case S[I] of
         '"': Result := Result + '"';
-        '': Result := Result + '';
+        '\\': Result := Result + '\\';
         '/': Result := Result + '/';
         'n': Result := Result + #10;
         'r': Result := Result + #13;
@@ -180,7 +182,174 @@ begin
             if I + 4 <= Length(S) then
             begin
               Hex := Copy(S, I + 1, 4);
-              Result := Result + WideChar(StrToIntDef('$' + Hex, Ord('?')));
+              Result := Result + WideChar(StrToIntDef('
+
+function PosFrom(const SubStr, S: string; StartPos: Integer): Integer;
+var
+  P: Integer;
+begin
+  if StartPos < 1 then StartPos := 1;
+  if SubStr = '' then
+  begin
+    Result := StartPos;
+    Exit;
+  end;
+  if StartPos > Length(S) then
+  begin
+    Result := 0;
+    Exit;
+  end;
+  P := Pos(SubStr, Copy(S, StartPos, MaxInt));
+  if P = 0 then
+    Result := 0
+  else
+    Result := StartPos + P - 1;
+end;
+
+function JsonIntAfter(const AJSON, AName: string; AStart: Integer): Integer;
+var
+  P, StartPos, EndPos: Integer;
+  Search: string;
+begin
+  Result := 0;
+  Search := '"' + AName + '"';
+  P := PosFrom(Search, AJSON, AStart);
+  if P = 0 then Exit;
+  P := P + Length(Search);
+  while (P <= Length(AJSON)) and (AJSON[P] <> ':') do Inc(P);
+  if P > Length(AJSON) then Exit;
+  Inc(P);
+  while (P <= Length(AJSON)) and (AJSON[P] in [' ', #9, #10, #13]) do Inc(P);
+  StartPos := P;
+  EndPos := P;
+  while (EndPos <= Length(AJSON)) and (AJSON[EndPos] in ['0'..'9', '-']) do Inc(EndPos);
+  Result := StrToIntDef(Copy(AJSON, StartPos, EndPos - StartPos), 0);
+end;
+
+function JsonStringAfter(const AJSON, AName: string; AStart: Integer): string;
+var
+  P, StartPos, EndPos: Integer;
+  Search: string;
+begin
+  Result := '';
+  Search := '"' + AName + '"';
+  P := PosEx(Search, AJSON, AStart);
+  if P = 0 then Exit;
+  P := P + Length(Search);
+  while (P <= Length(AJSON)) and (AJSON[P] <> ':') do Inc(P);
+  if P > Length(AJSON) then Exit;
+  Inc(P);
+  while (P <= Length(AJSON)) and (AJSON[P] in [' ', #9, #10, #13]) do Inc(P);
+  if (P > Length(AJSON)) or (AJSON[P] <> '"') then Exit;
+  StartPos := P + 1;
+  EndPos := StartPos;
+  while EndPos <= Length(AJSON) do
+  begin
+    if (AJSON[EndPos] = '"') and
+       ((EndPos = StartPos) or (AJSON[EndPos - 1] <> '\\')) then Break;
+    Inc(EndPos);
+  end;
+  if EndPos <= Length(AJSON) then
+    Result := JsonUnescape(Copy(AJSON, StartPos, EndPos - StartPos));
+end;
+
+procedure InitResult(var AResult: TPeppolValidationResult);
+begin
+  FillChar(AResult, SizeOf(AResult), 0);
+  AResult.Errors := TStringList.Create;
+end;
+
+procedure FreePeppolValidationResult(var AResult: TPeppolValidationResult);
+begin
+  if AResult.Errors <> nil then AResult.Errors.Free;
+  FillChar(AResult, SizeOf(AResult), 0);
+end;
+
+function ValidatePeppolXMLFile(const AFileName: string;
+  out AResult: TPeppolValidationResult): Boolean;
+var
+  Jar, JavaExe, Cmd, Output, S: string;
+  ExitCode: Cardinal;
+  P, I: Integer;
+begin
+  InitResult(AResult);
+  Result := False;
+
+  if not FileExists(AFileName) then
+  begin
+    AResult.Errors.Add('XML súbor neexistuje: ' + AFileName);
+    Exit;
+  end;
+
+  Jar := FindValidatorJar;
+  if Jar = '' then
+  begin
+    AResult.Errors.Add('Peppol validator JAR nie je nainštalovaný. Spustite peppol-validator' +
+      PathDelim + 'build-validator.bat.');
+    Exit;
+  end;
+
+  JavaExe := FindJavaExe;
+  Cmd := QuoteArg(JavaExe) + ' -Xss2m -jar ' + QuoteArg(Jar) + ' auto ' + QuoteArg(AFileName);
+
+  if not RunProcessCapture(Cmd, Output, ExitCode) then
+  begin
+    AResult.Errors.Add('Nepodarilo sa spustiť Peppol validator.');
+    Exit;
+  end;
+
+  P := Pos('{"valid":', Output);
+  if P = 0 then
+  begin
+    if Trim(Output) <> '' then
+      AResult.Errors.Add(Trim(Output))
+    else
+      AResult.Errors.Add('Validator nevrátil výsledok (exit code ' + IntToStr(ExitCode) + ').');
+    Exit;
+  end;
+
+  S := Copy(Output, P, MaxInt);
+  AResult.Valid := Pos('"valid":true', S) > 0;
+  AResult.VES := JsonStringAfter(S, 'ves', 1);
+  AResult.ErrorCount := JsonIntAfter(S, 'errorCount', 1);
+
+  I := 1;
+  while True do
+  begin
+    P := PosFrom('"message":"', S, I);
+    if P = 0 then Break;
+    S := S; // keep compiler-compatible with old Delphi
+    AResult.Errors.Add(JsonStringAfter(Copy(Output, P, MaxInt), 'message', 1));
+    I := P + 10;
+  end;
+
+  Result := True;
+end;
+
+function ValidatePeppolXMLText(const AXML: string;
+  out AResult: TPeppolValidationResult): Boolean;
+var
+  TempFile: string;
+  FS: TFileStream;
+begin
+  TempFile := IncludeTrailingPathDelimiter(GetEnvironmentVariable('TEMP')) +
+    Format('epostak-peppol-%d.xml', [GetTickCount]);
+  FS := TFileStream.Create(TempFile, fmCreate);
+  try
+    if Length(AXML) > 0 then
+      FS.WriteBuffer(AXML[1], Length(AXML));
+  finally
+    FS.Free;
+  end;
+  try
+    Result := ValidatePeppolXMLFile(TempFile, AResult);
+  finally
+    DeleteFile(TempFile);
+  end;
+end;
+
+end.
+ + Hex, Ord('?')));
               Inc(I, 4);
             end;
           end;
