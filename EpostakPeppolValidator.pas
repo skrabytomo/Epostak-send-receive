@@ -189,7 +189,7 @@ begin
       Inc(I);
       case S[I] of
         '"': Result := Result + '"';
-        '': Result := Result + '';
+        '\': Result := Result + '\';
         '/': Result := Result + '/';
         'n': Result := Result + #10;
         'r': Result := Result + #13;
