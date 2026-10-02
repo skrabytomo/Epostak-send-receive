@@ -184,7 +184,7 @@ begin
   I := 1;
   while I <= Length(S) do
   begin
-    if (S[I] = '\\') and (I < Length(S)) then
+    if (S[I] = '\') and (I < Length(S)) then
     begin
       Inc(I);
       case S[I] of
@@ -242,7 +242,7 @@ var
 begin
   Result := '';
   Search := '"' + AName + '"';
-  P := PosEx(Search, AJSON, AStart);
+  P := PosFrom(Search, AJSON, AStart);
   if P = 0 then Exit;
   P := P + Length(Search);
   while (P <= Length(AJSON)) and (AJSON[P] <> ':') do Inc(P);
@@ -255,7 +255,7 @@ begin
   while EndPos <= Length(AJSON) do
   begin
     if (AJSON[EndPos] = '"') and
-       ((EndPos = StartPos) or (AJSON[EndPos - 1] <> '\\')) then Break;
+       ((EndPos = StartPos) or (AJSON[EndPos - 1] <> '\')) then Break;
     Inc(EndPos);
   end;
   if EndPos <= Length(AJSON) then
