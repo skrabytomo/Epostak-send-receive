@@ -245,7 +245,7 @@ var
 begin
   Result := '';
   Search := '"' + AName + '"';
-  P := PosEx(Search, AJSON, AStart);
+  P := PosFrom(Search, AJSON, AStart);
   if P = 0 then Exit;
   P := P + Length(Search);
   while (P <= Length(AJSON)) and (AJSON[P] <> ':') do Inc(P);
@@ -485,7 +485,7 @@ begin
   I := 1;
   while True do
   begin
-    P := PosEx('"message":"', S, I);
+    P := PosFrom('"message":"', S, I);
     if P = 0 then Break;
     S := S; // keep compiler-compatible with old Delphi
     AResult.Errors.Add(JsonStringAfter(Copy(Output, P, MaxInt), 'message', 1));
