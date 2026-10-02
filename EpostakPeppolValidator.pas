@@ -165,12 +165,12 @@ begin
   I := 1;
   while I <= Length(S) do
   begin
-    if (S[I] = '\\') and (I < Length(S)) then
+    if (S[I] = '\') and (I < Length(S)) then
     begin
       Inc(I);
       case S[I] of
         '"': Result := Result + '"';
-        '\\': Result := Result + '\\';
+        '\': Result := Result + '\';
         '/': Result := Result + '/';
         'n': Result := Result + #10;
         'r': Result := Result + #13;
@@ -182,7 +182,19 @@ begin
             if I + 4 <= Length(S) then
             begin
               Hex := Copy(S, I + 1, 4);
-              Result := Result + WideChar(StrToIntDef('
+              Result := Result + WideChar(StrToIntDef('$' + Hex, Ord('?')));
+              Inc(I, 4);
+            end;
+          end;
+      else
+        Result := Result + S[I];
+      end;
+    end
+    else
+      Result := Result + S[I];
+    Inc(I);
+  end;
+end;
 
 function PosFrom(const SubStr, S: string; StartPos: Integer): Integer;
 var
@@ -246,7 +258,7 @@ begin
   while EndPos <= Length(AJSON) do
   begin
     if (AJSON[EndPos] = '"') and
-       ((EndPos = StartPos) or (AJSON[EndPos - 1] <> '\\')) then Break;
+       ((EndPos = StartPos) or (AJSON[EndPos - 1] <> '\')) then Break;
     Inc(EndPos);
   end;
   if EndPos <= Length(AJSON) then
