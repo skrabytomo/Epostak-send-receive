@@ -153,12 +153,12 @@ begin
   I := 1;
   while I <= Length(S) do
   begin
-    if (S[I] = '\') and (I < Length(S)) then
+    if (S[I] = #92) and (I < Length(S)) then
     begin
       Inc(I);
       case S[I] of
         '"': Result := Result + '"';
-        '\': Result := Result + '\';
+        #92: Result := Result + #92;
         '/': Result := Result + '/';
         'n': Result := Result + #10;
         'r': Result := Result + #13;
@@ -244,7 +244,7 @@ begin
   while EndPos <= Length(AJSON) do
   begin
     if (AJSON[EndPos] = '"') and
-       ((EndPos = StartPos) or (AJSON[EndPos - 1] <> '\')) then Break;
+       ((EndPos = StartPos) or (AJSON[EndPos - 1] <> #92)) then Break;
     Inc(EndPos);
   end;
   if EndPos <= Length(AJSON) then
