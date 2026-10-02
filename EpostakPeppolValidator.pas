@@ -175,6 +175,13 @@ begin
     Result := StartPos + P - 1;
 end;
 
+function UTF8BytesToAnsi(const S: string): string;
+var W: WideString;
+begin
+  W := UTF8Decode(S);
+  Result := W;
+end;
+
 function JsonUnescape(const S: string): string;
 var
   I: Integer;
@@ -317,7 +324,7 @@ begin
     Exit;
   end;
 
-  S := Copy(Output, P, MaxInt);
+  S := UTF8BytesToAnsi(Copy(Output, P, MaxInt));
   AResult.Valid := Pos('"valid":true', S) > 0;
   AResult.VES := JsonStringAfter(S, 'ves', 1);
   AResult.ErrorCount := JsonIntAfter(S, 'errorCount', 1);
