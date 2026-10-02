@@ -132,9 +132,8 @@ begin
     CloseHandle(WritePipe);
     WritePipe := 0;
 
-    WaitForSingleObject(PI.hProcess, INFINITE);
-    GetExitCodeProcess(PI.hProcess, AExitCode);
-
+    { Drain the pipe while the child is running. Waiting for the process
+      first can deadlock when stdout/stderr exceeds the pipe buffer. }
     repeat
       ReadBytes := 0;
       if not ReadFile(ReadPipe, Buffer[0], SizeOf(Buffer), ReadBytes, nil) then Break;
@@ -145,6 +144,9 @@ begin
         AOutput := AOutput + Cmd;
       end;
     until ReadBytes = 0;
+
+    WaitForSingleObject(PI.hProcess, INFINITE);
+    GetExitCodeProcess(PI.hProcess, AExitCode);
 
     CloseHandle(PI.hThread);
     CloseHandle(PI.hProcess);
