@@ -25,7 +25,7 @@ implementation
 function FindValidatorJar: string;
 var
   Candidates: TStringList;
-  I: Integer;
+  I, P: Integer;
   EnvJar, Base: string;
 begin
   Result := '';
@@ -79,12 +79,10 @@ function PeppolValidatorAvailable: Boolean;
 var
   JavaExe: string;
   Buffer: array[0..MAX_PATH - 1] of Char;
-  FilePart: PChar;
 begin
   JavaExe := FindJavaExe;
-  FilePart := nil;
   Result := (FindValidatorJar <> '') and
-            (SearchPath(nil, PChar(JavaExe), nil, MAX_PATH, Buffer, FilePart) > 0);
+            (SearchPath(nil, PChar(JavaExe), nil, SizeOf(Buffer), Buffer, nil) > 0);
 end;
 
 function QuoteArg(const S: string): string;
@@ -102,6 +100,7 @@ var
   Buffer: array[0..4095] of Byte;
   ReadBytes: DWORD;
   Cmd: string;
+  H: THandle;
 begin
   Result := False;
   AOutput := '';
@@ -132,8 +131,9 @@ begin
     CloseHandle(WritePipe);
     WritePipe := 0;
 
-    { Drain the pipe while the child is running. Waiting for the process
-      first can deadlock when stdout/stderr exceeds the pipe buffer. }
+    WaitForSingleObject(PI.hProcess, INFINITE);
+    GetExitCodeProcess(PI.hProcess, AExitCode);
+
     repeat
       ReadBytes := 0;
       if not ReadFile(ReadPipe, Buffer[0], SizeOf(Buffer), ReadBytes, nil) then Break;
@@ -145,9 +145,6 @@ begin
       end;
     until ReadBytes = 0;
 
-    WaitForSingleObject(PI.hProcess, INFINITE);
-    GetExitCodeProcess(PI.hProcess, AExitCode);
-
     CloseHandle(PI.hThread);
     CloseHandle(PI.hProcess);
     Result := True;
@@ -155,31 +152,6 @@ begin
     if WritePipe <> 0 then CloseHandle(WritePipe);
     if ReadPipe <> 0 then CloseHandle(ReadPipe);
   end;
-end;
-
-function PosFrom(const SubStr, S: string; StartPos: Integer): Integer;
-var
-  P: Integer;
-  Tail: string;
-begin
-  Result := 0;
-  if (StartPos < 1) or (StartPos > Length(S)) then Exit;
-  if SubStr = '' then
-  begin
-    Result := StartPos;
-    Exit;
-  end;
-  Tail := Copy(S, StartPos, Length(S) - StartPos + 1);
-  P := Pos(SubStr, Tail);
-  if P > 0 then
-    Result := StartPos + P - 1;
-end;
-
-function UTF8BytesToAnsi(const S: string): string;
-var W: WideString;
-begin
-  W := UTF8Decode(S);
-  Result := W;
 end;
 
 function JsonUnescape(const S: string): string;
@@ -191,12 +163,12 @@ begin
   I := 1;
   while I <= Length(S) do
   begin
-    if (S[I] = '\') and (I < Length(S)) then
+    if (S[I] = '') and (I < Length(S)) then
     begin
       Inc(I);
       case S[I] of
         '"': Result := Result + '"';
-        '\': Result := Result + '\';
+        '': Result := Result + '';
         '/': Result := Result + '/';
         'n': Result := Result + #10;
         'r': Result := Result + #13;
@@ -208,7 +180,7 @@ begin
             if I + 4 <= Length(S) then
             begin
               Hex := Copy(S, I + 1, 4);
-              Result := Result + Char(StrToIntDef('$' + Hex, Ord('?')));
+              Result := Result + WideChar(StrToIntDef('$' + Hex, Ord('?')));
               Inc(I, 4);
             end;
           end;
@@ -229,7 +201,7 @@ var
 begin
   Result := 0;
   Search := '"' + AName + '"';
-  P := PosFrom(Search, AJSON, AStart);
+  P := PosEx(Search, AJSON, AStart);
   if P = 0 then Exit;
   P := P + Length(Search);
   while (P <= Length(AJSON)) and (AJSON[P] <> ':') do Inc(P);
@@ -249,7 +221,7 @@ var
 begin
   Result := '';
   Search := '"' + AName + '"';
-  P := PosFrom(Search, AJSON, AStart);
+  P := PosEx(Search, AJSON, AStart);
   if P = 0 then Exit;
   P := P + Length(Search);
   while (P <= Length(AJSON)) and (AJSON[P] <> ':') do Inc(P);
@@ -262,7 +234,7 @@ begin
   while EndPos <= Length(AJSON) do
   begin
     if (AJSON[EndPos] = '"') and
-       ((EndPos = StartPos) or (AJSON[EndPos - 1] <> '\')) then Break;
+       ((EndPos = StartPos) or (AJSON[EndPos - 1] <> '')) then Break;
     Inc(EndPos);
   end;
   if EndPos <= Length(AJSON) then
@@ -324,7 +296,7 @@ begin
     Exit;
   end;
 
-  S := UTF8BytesToAnsi(Copy(Output, P, MaxInt));
+  S := Copy(Output, P, MaxInt);
   AResult.Valid := Pos('"valid":true', S) > 0;
   AResult.VES := JsonStringAfter(S, 'ves', 1);
   AResult.ErrorCount := JsonIntAfter(S, 'errorCount', 1);
@@ -332,8 +304,9 @@ begin
   I := 1;
   while True do
   begin
-    P := PosFrom('"message":"', S, I);
+    P := PosEx('"message":"', S, I);
     if P = 0 then Break;
+    S := S; // keep compiler-compatible with old Delphi
     AResult.Errors.Add(JsonStringAfter(Copy(Output, P, MaxInt), 'message', 1));
     I := P + 10;
   end;
