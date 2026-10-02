@@ -79,10 +79,12 @@ function PeppolValidatorAvailable: Boolean;
 var
   JavaExe: string;
   Buffer: array[0..MAX_PATH - 1] of Char;
+  FilePart: PChar;
 begin
   JavaExe := FindJavaExe;
+  FilePart := nil;
   Result := (FindValidatorJar <> '') and
-            (SearchPath(nil, PChar(JavaExe), nil, SizeOf(Buffer), Buffer, nil) > 0);
+            (SearchPath(nil, PChar(JavaExe), nil, MAX_PATH, Buffer, FilePart) > 0);
 end;
 
 function QuoteArg(const S: string): string;
