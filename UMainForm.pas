@@ -558,7 +558,7 @@ begin
     end;
 
     A('</Invoice>');
-    Result := SB.Text;
+    Result := UTF8Encode(SB.Text);
   finally
     SB.Free;
   end;
