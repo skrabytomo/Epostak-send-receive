@@ -3,7 +3,7 @@ unit EpostakPeppolValidator;
 interface
 
 uses
-  Windows, SysUtils, Classes, WinInet, ComObj, Variants;
+  Windows, SysUtils, StrUtils, Classes, WinInet, ComObj, Variants;
 
 type
   TPeppolValidationResult = record
@@ -33,10 +33,12 @@ begin
   try
     EnvJar := Trim(GetEnvironmentVariable('EPOSTAK_PEPPOL_VALIDATOR_JAR'));
     if EnvJar <> '' then Candidates.Add(EnvJar);
+
     Base := ExtractFilePath(ParamStr(0));
     Candidates.Add(Base + 'EpostakPeppolValidator.jar');
     Candidates.Add(Base + 'peppol-validator' + PathDelim + 'target' +
       PathDelim + 'EpostakPeppolValidator.jar');
+
     for I := 0 to Candidates.Count - 1 do
       if FileExists(Candidates[I]) then
       begin
@@ -64,6 +66,7 @@ begin
       Exit;
     end;
   end;
+
   Candidate := IncludeTrailingPathDelimiter(GetEnvironmentVariable('WINDIR')) +
     'System32' + PathDelim + 'java.exe';
   if FileExists(Candidate) then
@@ -81,12 +84,12 @@ begin
   JavaExe := FindJavaExe;
   FilePart := nil;
   Result := (FindValidatorJar <> '') and
-            (SearchPath(nil, PChar(JavaExe), nil, SizeOf(Buffer), Buffer, FilePart) > 0);
+            (SearchPath(nil, PChar(JavaExe), nil, MAX_PATH, Buffer, FilePart) > 0);
 end;
 
 function QuoteArg(const S: string): string;
 begin
-  Result := '"' + StringReplace(S, '"', '"' , [rfReplaceAll]) + '"';
+  Result := '"' + StringReplace(S, '"', '"', [rfReplaceAll]) + '"';
 end;
 
 function RunProcessCapture(const ACommandLine: string; out AOutput: string;
@@ -108,23 +111,30 @@ begin
   FillChar(SA, SizeOf(SA), 0);
   SA.nLength := SizeOf(SA);
   SA.bInheritHandle := True;
+
   if not CreatePipe(ReadPipe, WritePipe, @SA, 0) then Exit;
   try
     SetHandleInformation(ReadPipe, HANDLE_FLAG_INHERIT, 0);
+
     FillChar(SI, SizeOf(SI), 0);
     SI.cb := SizeOf(SI);
     SI.dwFlags := STARTF_USESTDHANDLES;
     SI.hStdOutput := WritePipe;
     SI.hStdError := WritePipe;
     SI.hStdInput := GetStdHandle(STD_INPUT_HANDLE);
+
     FillChar(PI, SizeOf(PI), 0);
     Cmd := ACommandLine;
     if not CreateProcess(nil, PChar(Cmd), nil, nil, True,
-      CREATE_NO_WINDOW, nil, nil, SI, PI) then Exit;
+      CREATE_NO_WINDOW, nil, nil, SI, PI) then
+      Exit;
+
     CloseHandle(WritePipe);
     WritePipe := 0;
+
     WaitForSingleObject(PI.hProcess, INFINITE);
     GetExitCodeProcess(PI.hProcess, AExitCode);
+
     repeat
       ReadBytes := 0;
       if not ReadFile(ReadPipe, Buffer[0], SizeOf(Buffer), ReadBytes, nil) then Break;
@@ -135,6 +145,7 @@ begin
         AOutput := AOutput + Cmd;
       end;
     until ReadBytes = 0;
+
     CloseHandle(PI.hThread);
     CloseHandle(PI.hProcess);
     Result := True;
@@ -145,6 +156,8 @@ begin
 end;
 
 function JsonUnescape(const S: string): string;
+const
+  BACKSLASH = #92;
 var
   I: Integer;
   Hex: string;
@@ -153,24 +166,24 @@ begin
   I := 1;
   while I <= Length(S) do
   begin
-    if (S[I] = #92) and (I < Length(S)) then
+    if (S[I] = BACKSLASH) and (I < Length(S)) then
     begin
       Inc(I);
       case S[I] of
-        '"': Result := Result + '"';
-        #92: Result := Result + #92;
-        '/': Result := Result + '/';
-        'n': Result := Result + #10;
-        'r': Result := Result + #13;
-        't': Result := Result + #9;
-        'b': Result := Result + #8;
-        'f': Result := Result + #12;
+        '"':       Result := Result + '"';
+        BACKSLASH: Result := Result + BACKSLASH;
+        '/':       Result := Result + '/';
+        'n':       Result := Result + #10;
+        'r':       Result := Result + #13;
+        't':       Result := Result + #9;
+        'b':       Result := Result + #8;
+        'f':       Result := Result + #12;
         'u':
           begin
             if I + 4 <= Length(S) then
             begin
               Hex := Copy(S, I + 1, 4);
-              Result := Result + WideChar(StrToIntDef('$' + Hex, Ord('?')));
+              Result := Result + Chr(StrToIntDef('$' + Hex, Ord('?')));
               Inc(I, 4);
             end;
           end;
@@ -184,26 +197,6 @@ begin
   end;
 end;
 
-function PosFrom(const SubStr, S: string; StartPos: Integer): Integer;
-var
-  P: Integer;
-begin
-  if StartPos < 1 then StartPos := 1;
-  if SubStr = '' then
-  begin
-    Result := StartPos;
-    Exit;
-  end;
-  if StartPos > Length(S) then
-  begin
-    Result := 0;
-    Exit;
-  end;
-  P := Pos(SubStr, Copy(S, StartPos, MaxInt));
-  if P = 0 then Result := 0
-  else Result := StartPos + P - 1;
-end;
-
 function JsonIntAfter(const AJSON, AName: string; AStart: Integer): Integer;
 var
   P, StartPos, EndPos: Integer;
@@ -211,7 +204,7 @@ var
 begin
   Result := 0;
   Search := '"' + AName + '"';
-  P := PosFrom(Search, AJSON, AStart);
+  P := PosEx(Search, AJSON, AStart);
   if P = 0 then Exit;
   P := P + Length(Search);
   while (P <= Length(AJSON)) and (AJSON[P] <> ':') do Inc(P);
@@ -231,7 +224,7 @@ var
 begin
   Result := '';
   Search := '"' + AName + '"';
-  P := PosFrom(Search, AJSON, AStart);
+  P := PosEx(Search, AJSON, AStart);
   if P = 0 then Exit;
   P := P + Length(Search);
   while (P <= Length(AJSON)) and (AJSON[P] <> ':') do Inc(P);
@@ -244,7 +237,7 @@ begin
   while EndPos <= Length(AJSON) do
   begin
     if (AJSON[EndPos] = '"') and
-       ((EndPos = StartPos) or (AJSON[EndPos - 1] <> #92)) then Break;
+       ((EndPos = StartPos) or (AJSON[EndPos - 1] <> '')) then Break;
     Inc(EndPos);
   end;
   if EndPos <= Length(AJSON) then
@@ -272,11 +265,13 @@ var
 begin
   InitResult(AResult);
   Result := False;
+
   if not FileExists(AFileName) then
   begin
     AResult.Errors.Add('XML súbor neexistuje: ' + AFileName);
     Exit;
   end;
+
   Jar := FindValidatorJar;
   if Jar = '' then
   begin
@@ -284,32 +279,41 @@ begin
       PathDelim + 'build-validator.bat.');
     Exit;
   end;
+
   JavaExe := FindJavaExe;
   Cmd := QuoteArg(JavaExe) + ' -Xss2m -jar ' + QuoteArg(Jar) + ' auto ' + QuoteArg(AFileName);
+
   if not RunProcessCapture(Cmd, Output, ExitCode) then
   begin
     AResult.Errors.Add('Nepodarilo sa spustiť Peppol validator.');
     Exit;
   end;
+
   P := Pos('{"valid":', Output);
   if P = 0 then
   begin
-    if Trim(Output) <> '' then AResult.Errors.Add(Trim(Output))
-    else AResult.Errors.Add('Validator nevrátil výsledok (exit code ' + IntToStr(ExitCode) + ').');
+    if Trim(Output) <> '' then
+      AResult.Errors.Add(Trim(Output))
+    else
+      AResult.Errors.Add('Validator nevrátil výsledok (exit code ' + IntToStr(ExitCode) + ').');
     Exit;
   end;
+
   S := Copy(Output, P, MaxInt);
   AResult.Valid := Pos('"valid":true', S) > 0;
   AResult.VES := JsonStringAfter(S, 'ves', 1);
   AResult.ErrorCount := JsonIntAfter(S, 'errorCount', 1);
+
   I := 1;
   while True do
   begin
-    P := PosFrom('"message":"', S, I);
+    P := PosEx('"message":"', S, I);
     if P = 0 then Break;
+    S := S; // keep compiler-compatible with old Delphi
     AResult.Errors.Add(JsonStringAfter(Copy(Output, P, MaxInt), 'message', 1));
     I := P + 10;
   end;
+
   Result := True;
 end;
 
@@ -323,7 +327,8 @@ begin
     Format('epostak-peppol-%d.xml', [GetTickCount]);
   FS := TFileStream.Create(TempFile, fmCreate);
   try
-    if Length(AXML) > 0 then FS.WriteBuffer(AXML[1], Length(AXML));
+    if Length(AXML) > 0 then
+      FS.WriteBuffer(AXML[1], Length(AXML));
   finally
     FS.Free;
   end;

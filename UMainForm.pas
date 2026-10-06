@@ -3,9 +3,9 @@ unit UMainForm;
 interface
 
 uses
-  Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms, Dialogs,
+  Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
   StdCtrls, ComCtrls, ExtCtrls, IniFiles, FileCtrl, DB, ADODB,
-  EpostakClient, EpostakDemoCreds, EpostakPeppolEAS, EpostakPeppolValidator;
+  EpostakClient, EpostakDemoCreds;
 
 type
   TFARiadok = record
@@ -467,8 +467,7 @@ begin
 
     // SUPPLIER
     A('  <cac:AccountingSupplierParty><cac:Party>');
-    A('    <cbc:EndpointID schemeID="' + Copy(edtParticipantId.Text, 1, 4) + '">' +
-        XMLEscape(Copy(edtParticipantId.Text, 6, 255)) + '</cbc:EndpointID>');
+    A('    <cbc:EndpointID schemeID="0196">' + XMLEscape(SupDIC) + '</cbc:EndpointID>');
     A('    <cac:PostalAddress>');
     A('      <cbc:StreetName>' + XMLEscape(SupUlica) + '</cbc:StreetName>');
     A('      <cbc:CityName>' + XMLEscape(SupMesto) + '</cbc:CityName>');
@@ -487,8 +486,7 @@ begin
 
     // CUSTOMER
     A('  <cac:AccountingCustomerParty><cac:Party>');
-    A('    <cbc:EndpointID schemeID="' + Copy(edtReceiverId.Text, 1, 4) + '">' +
-        XMLEscape(Copy(edtReceiverId.Text, 6, 255)) + '</cbc:EndpointID>');
+    A('    <cbc:EndpointID schemeID="0196">' + XMLEscape(CusDIC) + '</cbc:EndpointID>');
     A('    <cac:PostalAddress>');
     A('      <cbc:StreetName>' + XMLEscape(CusUlica) + '</cbc:StreetName>');
     A('      <cbc:CityName>' + XMLEscape(CusMesto) + '</cbc:CityName>');
@@ -600,11 +598,6 @@ begin
 
   dlgOpenXML.Filter := 'XML subory (*.xml)|*.xml|Vsetky (*.*)|*.*';
 
-  if PeppolValidatorAvailable then
-    Log('Peppol validator: pripraveny.')
-  else
-    Log('VAROVANIE: Peppol validator nie je pripraveny. Pred odoslanim zostavte peppol-validator.');
-
   // Auto-connect to InTime DB on startup
   ConnectDB;
 end;
@@ -693,8 +686,6 @@ begin
 end;
 
 procedure TFormMain.ConnectDB;
-var
-  Updated: Integer;
 const
   DB_CONNSTR =
     'Driver={Firebird/InterBase(r) driver};' +
@@ -720,28 +711,6 @@ begin
     FDBConn.Open;
     Log('OK: Pripojeny k 192.168.1.15:C:\Dochadzka.NET\DOCHADZKA.GDB');
     btnConnectDB.Caption := 'Pripojeny';
-
-    // Update Peppol EAS codelist if needed
-    try
-      if PeppolEASNeedsUpdate(FDBConn) then
-      begin
-        Log('Aktualizujem Peppol EAS codelist...');
-        try
-          if UpdatePeppolEAS(FDBConn, Updated) then
-            Log('Peppol EAS: aktualizovanych ' + IntToStr(Updated) + ' schém.')
-          else
-            Log('Peppol EAS: aktualizacia zlyhala — GetLatestEASUrl vrátila prázdny URL alebo download zlyhal.');
-        except
-          on E: Exception do
-            Log('Peppol EAS update exception: ' + E.ClassName + ': ' + E.Message);
-        end;
-      end
-      else
-        Log('Peppol EAS: codelist je aktualny.');
-    except
-      on E: Exception do
-        Log('Peppol EAS warning: ' + E.Message);
-    end;
   except
     on E: Exception do
     begin
@@ -858,8 +827,6 @@ procedure TFormMain.btnSendClick(Sender: TObject);
 var
   Client: TEpostakClient;
   UblXml, DocId: string;
-  V: TPeppolValidationResult;
-  VI: Integer;
 begin
   if Trim(edtBaseURL.Text) = '' then begin Log('CHYBA: Vyplnte Base URL.'); Exit; end;
   if Trim(edtParticipantId.Text) = '' then begin Log('CHYBA: Vyplnte Participant ID.'); Exit; end;
@@ -884,33 +851,6 @@ begin
   end;
 
   if Trim(UblXml) = '' then begin Log('CHYBA: XML je prazdny.'); Exit; end;
-
-  // Fail-closed: dokument nesmie byt odoslany bez lokalnej Peppol validacie.
-  try
-    Log('Spustam lokalnu Peppol validaciu...');
-    if not ValidatePeppolXMLText(UblXml, V) then
-    begin
-      if (V.Errors <> nil) and (V.Errors.Count > 0) then
-        Log('VALIDATOR CHYBA: ' + V.Errors[0])
-      else
-        Log('VALIDATOR CHYBA: validator nie je dostupny.');
-      Exit;
-    end;
-
-    if not V.Valid then
-    begin
-      Log('STOP: XML nepreslo Peppol validaciou (' + V.VES + ').');
-      if V.Errors.Count > 0 then
-      begin
-        for VI := 0 to V.Errors.Count - 1 do
-          Log('  ' + V.Errors[VI]);
-      end;
-      Exit;
-    end;
-    Log('OK: XML preslo Peppol validaciou (' + V.VES + ').');
-  finally
-    FreePeppolValidationResult(V);
-  end;
 
   try
     Client := MakeClient;
@@ -970,11 +910,7 @@ begin
 end;
 
 procedure TFormMain.btnDownloadSelectedClick(Sender: TObject);
-var
-  Client: TEpostakClient;
-  DocId, XML, SavePath: string;
-  V: TPeppolValidationResult;
-  VI: Integer;
+var Client: TEpostakClient; DocId, XML, SavePath: string;
 begin
   DocId := GetSelectedDocId;
   if DocId = '' then begin Log('Vyberte dokument.'); Exit; end;
@@ -986,24 +922,6 @@ begin
     XML := Client.GetDocumentXML(DocId);
     SaveRawBytesToFile(SavePath, XML);
     Log('ULOZENE: ' + SavePath);
-
-    try
-      if ValidatePeppolXMLFile(SavePath, V) then
-      begin
-        if V.Valid then
-          Log('VALIDACIA: OK (' + V.VES + ').')
-        else
-        begin
-          Log('VALIDACIA: CHYBA (' + V.VES + ').');
-          for VI := 0 to V.Errors.Count - 1 do
-            Log('  ' + V.Errors[VI]);
-        end;
-      end
-      else if (V.Errors <> nil) and (V.Errors.Count > 0) then
-        Log('VALIDATOR CHYBA: ' + V.Errors[0]);
-    finally
-      FreePeppolValidationResult(V);
-    end;
   except
     on E: Exception do Log('CHYBA: ' + E.Message);
   end;
