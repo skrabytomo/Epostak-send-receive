@@ -3,7 +3,7 @@ unit EpostakPeppolValidator;
 interface
 
 uses
-  Windows, SysUtils, StrUtils, Classes, WinInet, ComObj, Variants;
+  Windows, SysUtils, Classes, WinInet, ComObj, Variants;
 
 type
   TPeppolValidationResult = record
@@ -21,6 +21,20 @@ function ValidatePeppolXMLText(const AXML: string;
 procedure FreePeppolValidationResult(var AResult: TPeppolValidationResult);
 
 implementation
+
+function PosEx(const SubStr, S: string; Offset: Integer): Integer;
+var
+  I: Integer;
+begin
+  Result := 0;
+  if (SubStr = '') or (S = '') or (Offset > Length(S)) then Exit;
+  for I := Offset to Length(S) - Length(SubStr) + 1 do
+    if Copy(S, I, Length(SubStr)) = SubStr then
+    begin
+      Result := I;
+      Exit;
+    end;
+end;
 
 function FindValidatorJar: string;
 var
