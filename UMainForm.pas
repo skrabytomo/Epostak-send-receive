@@ -467,7 +467,8 @@ begin
 
     // SUPPLIER
     A('  <cac:AccountingSupplierParty><cac:Party>');
-    A('    <cbc:EndpointID schemeID="0196">' + XMLEscape(SupDIC) + '</cbc:EndpointID>');
+    A('    <cbc:EndpointID schemeID="' + Copy(edtParticipantId.Text, 1, 4) + '">' +
+        XMLEscape(Copy(edtParticipantId.Text, 6, 255)) + '</cbc:EndpointID>');
     A('    <cac:PostalAddress>');
     A('      <cbc:StreetName>' + XMLEscape(SupUlica) + '</cbc:StreetName>');
     A('      <cbc:CityName>' + XMLEscape(SupMesto) + '</cbc:CityName>');
@@ -486,7 +487,8 @@ begin
 
     // CUSTOMER
     A('  <cac:AccountingCustomerParty><cac:Party>');
-    A('    <cbc:EndpointID schemeID="0196">' + XMLEscape(CusDIC) + '</cbc:EndpointID>');
+    A('    <cbc:EndpointID schemeID="' + Copy(edtReceiverId.Text, 1, 4) + '">' +
+        XMLEscape(Copy(edtReceiverId.Text, 6, 255)) + '</cbc:EndpointID>');
     A('    <cac:PostalAddress>');
     A('      <cbc:StreetName>' + XMLEscape(CusUlica) + '</cbc:StreetName>');
     A('      <cbc:CityName>' + XMLEscape(CusMesto) + '</cbc:CityName>');
