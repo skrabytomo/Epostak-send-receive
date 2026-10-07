@@ -545,7 +545,7 @@ begin
       A('  <cac:InvoiceLine>');
       A('    <cbc:ID>' + IntToStr(Riadky[i].PCRiadku) + '</cbc:ID>');
       A('    <cbc:InvoicedQuantity unitCode="' + MJToUnitCode(Riadky[i].MJ) + '">' + F4(Riadky[i].Mnozstvo) + '</cbc:InvoicedQuantity>');
-      A('    <cbc:LineExtensionAmount currencyID="' + Mena + '">' + F2(Riadky[i].CenaBezDPH) + '</cbc:LineExtensionAmount>');
+      A('    <cbc:LineExtensionAmount currencyID="' + Mena + '">' + F2(Riadky[i].Mnozstvo * Riadky[i].CenaJedn) + '</cbc:LineExtensionAmount>');
       A('    <cac:Item>');
       if Riadky[i].Text <> '' then
         A('      <cbc:Name>' + XMLEscape(Riadky[i].Text) + '</cbc:Name>')
