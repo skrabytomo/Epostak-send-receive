@@ -42,6 +42,11 @@ type
     btnSaveConfig: TButton;
     btnUseFirmA: TButton;
     btnUseFirmB: TButton;
+    btnAuthenticate: TButton;
+    btnTokenStatus: TButton;
+    btnRenewToken: TButton;
+    btnRevokeToken: TButton;
+    btnValidateXML: TButton;
     edtXMLFile: TEdit;
     btnBrowseXML: TButton;
     edtReceiverId: TEdit;
@@ -78,6 +83,11 @@ type
     procedure btnConnectDBClick(Sender: TObject);
     procedure btnLoadInvoicesClick(Sender: TObject);
     procedure btnLoadFromDBClick(Sender: TObject);
+    procedure btnAuthenticateClick(Sender: TObject);
+    procedure btnTokenStatusClick(Sender: TObject);
+    procedure btnRenewTokenClick(Sender: TObject);
+    procedure btnRevokeTokenClick(Sender: TObject);
+    procedure btnValidateXMLClick(Sender: TObject);
   private
     FClient:     TEpostakClient;
     FInboxItems: TEpostakDocumentListResult;
