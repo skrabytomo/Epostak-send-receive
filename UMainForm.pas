@@ -156,12 +156,12 @@ end;
 
 function TFormMain.F2(const V: Double): string;
 begin
-  Result := FloatToStrF(V, ffFixed, 10, 2);
+  Result := StringReplace(FloatToStrF(V, ffFixed, 10, 2), ',', '.', [rfReplaceAll]);
 end;
 
 function TFormMain.F4(const V: Double): string;
 begin
-  Result := FloatToStrF(V, ffFixed, 10, 4);
+  Result := StringReplace(FloatToStrF(V, ffFixed, 10, 4), ',', '.', [rfReplaceAll]);
 end;
 
 function TFormMain.NewGUID: string;
@@ -463,7 +463,10 @@ begin
     A('  <cbc:DueDate>' + FormatDateTime('yyyy-mm-dd', DatumSplatnosti) + '</cbc:DueDate>');
     A('  <cbc:InvoiceTypeCode>380</cbc:InvoiceTypeCode>');
     A('  <cbc:DocumentCurrencyCode>' + XMLEscape(Mena) + '</cbc:DocumentCurrencyCode>');
-    A('  <cbc:BuyerReference>' + XMLEscape(VarSymbol) + '</cbc:BuyerReference>');
+    if VarSymbol <> '' then
+      A('  <cbc:BuyerReference>' + XMLEscape(VarSymbol) + '</cbc:BuyerReference>')
+    else
+      A('  <cbc:BuyerReference>N/A</cbc:BuyerReference>');
 
     // SUPPLIER
     A('  <cac:AccountingSupplierParty><cac:Party>');
@@ -544,7 +547,10 @@ begin
       A('    <cbc:InvoicedQuantity unitCode="' + MJToUnitCode(Riadky[i].MJ) + '">' + F4(Riadky[i].Mnozstvo) + '</cbc:InvoicedQuantity>');
       A('    <cbc:LineExtensionAmount currencyID="' + Mena + '">' + F2(Riadky[i].CenaBezDPH) + '</cbc:LineExtensionAmount>');
       A('    <cac:Item>');
-      A('      <cbc:Name>' + XMLEscape(Riadky[i].Text) + '</cbc:Name>');
+      if Riadky[i].Text <> '' then
+        A('      <cbc:Name>' + XMLEscape(Riadky[i].Text) + '</cbc:Name>')
+      else
+        A('      <cbc:Name>-</cbc:Name>');
       A('      <cac:ClassifiedTaxCategory>');
       A('        <cbc:ID>' + DPHTaxCategory(Riadky[i].DPHSadzba) + '</cbc:ID>');
       A('        <cbc:Percent>' + F2(Riadky[i].DPHSadzba) + '</cbc:Percent>');
