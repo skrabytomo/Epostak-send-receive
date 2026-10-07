@@ -544,8 +544,14 @@ begin
     begin
       A('  <cac:InvoiceLine>');
       A('    <cbc:ID>' + IntToStr(Riadky[i].PCRiadku) + '</cbc:ID>');
-      A('    <cbc:InvoicedQuantity unitCode="' + MJToUnitCode(Riadky[i].MJ) + '">' + F4(Riadky[i].Mnozstvo) + '</cbc:InvoicedQuantity>');
-      A('    <cbc:LineExtensionAmount currencyID="' + Mena + '">' + F2(Riadky[i].Mnozstvo * Riadky[i].CenaJedn) + '</cbc:LineExtensionAmount>');
+      if Riadky[i].Mnozstvo = 0 then
+        A('    <cbc:InvoicedQuantity unitCode="C62">1</cbc:InvoicedQuantity>')
+      else
+        A('    <cbc:InvoicedQuantity unitCode="' + MJToUnitCode(Riadky[i].MJ) + '">' + F4(Riadky[i].Mnozstvo) + '</cbc:InvoicedQuantity>');
+      if Riadky[i].Mnozstvo = 0 then
+        A('    <cbc:LineExtensionAmount currencyID="' + Mena + '">' + F2(Riadky[i].CenaBezDPH) + '</cbc:LineExtensionAmount>')
+      else
+        A('    <cbc:LineExtensionAmount currencyID="' + Mena + '">' + F2(Riadky[i].Mnozstvo * Riadky[i].CenaJedn) + '</cbc:LineExtensionAmount>');
       A('    <cac:Item>');
       if Riadky[i].Text <> '' then
         A('      <cbc:Name>' + XMLEscape(Riadky[i].Text) + '</cbc:Name>')
@@ -558,7 +564,10 @@ begin
       A('      </cac:ClassifiedTaxCategory>');
       A('    </cac:Item>');
       A('    <cac:Price>');
-      A('      <cbc:PriceAmount currencyID="' + Mena + '">' + F4(Riadky[i].CenaJedn) + '</cbc:PriceAmount>');
+      if Riadky[i].Mnozstvo = 0 then
+        A('      <cbc:PriceAmount currencyID="' + Mena + '">' + F4(Riadky[i].CenaBezDPH) + '</cbc:PriceAmount>')
+      else
+        A('      <cbc:PriceAmount currencyID="' + Mena + '">' + F4(Riadky[i].CenaJedn) + '</cbc:PriceAmount>');
       A('    </cac:Price>');
       A('  </cac:InvoiceLine>');
     end;
