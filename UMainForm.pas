@@ -737,7 +737,9 @@ begin
         if UpdatePeppolEAS(FDBConn, Updated) then
           Log('Peppol EAS: aktualizovanych ' + IntToStr(Updated) + ' schem.')
         else
-          Log('Peppol EAS: aktualizacia zlyhala.');
+          Log('Peppol EAS: aktualizacia zlyhala - download alebo XML parse zlyhal. URL: ' +
+              'https://docs.peppol.eu/edelivery/codelists/v9.7/' +
+              'Peppol%20Code%20Lists%20-%20Participant%20identifier%20schemes%20v9.7.xml');
       end
       else
         Log('Peppol EAS: codelist je aktualny.');

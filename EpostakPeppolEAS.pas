@@ -3,7 +3,7 @@ unit EpostakPeppolEAS;
 interface
 
 uses
-  Windows, SysUtils, Classes, ADODB, WinInet, ComObj, Variants;
+  Windows, SysUtils, Classes, ADODB, ComObj, Variants;
 
 const
   PEPPOL_EAS_INDEX_URL = 'https://docs.peppol.eu/edelivery/codelists/';
@@ -28,6 +28,35 @@ begin
 end;
 
 function DownloadFile(const AUrl, AFileName: string): Boolean;
+var
+  HTTP: OleVariant;
+  Stream: OleVariant;
+  FS: TFileStream;
+  Data: string;
+begin
+  Result := False;
+  if Trim(AUrl) = '' then Exit;
+  try
+    // Use ServerXMLHTTP for better TLS 1.2 support vs WinInet
+    HTTP := CreateOleObject('MSXML2.ServerXMLHTTP.6.0');
+    HTTP.open('GET', AUrl, False);
+    HTTP.setOption(2, 13056); // SXH_OPTION_IGNORE_SERVER_SSL_CERT_ERROR_FLAGS
+    HTTP.send(EmptyParam);
+    if HTTP.status <> 200 then Exit;
+    // Save response to file
+    Stream := CreateOleObject('ADODB.Stream');
+    Stream.Type_ := 1; // adTypeBinary
+    Stream.Open(EmptyParam, 3, 4, EmptyParam, EmptyParam);
+    Stream.Write(HTTP.responseBody);
+    Stream.SaveToFile(AFileName, 2);
+    Stream.Close;
+    Result := True;
+  except
+    Result := False;
+  end;
+end;
+
+function DownloadFile_unused(const AUrl, AFileName: string): Boolean;
 var
   HInet, HUrl: HINTERNET;
   Buf: array[0..8191] of Byte;
