@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
   StdCtrls, ComCtrls, ExtCtrls, IniFiles, FileCtrl, DB, ADODB,
-  EpostakClient, EpostakDemoCreds;
+  EpostakClient, EpostakDemoCreds, EpostakPeppolEAS;
 
 type
   TFARiadok = record
@@ -703,6 +703,8 @@ begin
 end;
 
 procedure TFormMain.ConnectDB;
+var
+  Updated: Integer;
 const
   DB_CONNSTR =
     'Driver={Firebird/InterBase(r) driver};' +
@@ -728,6 +730,21 @@ begin
     FDBConn.Open;
     Log('OK: Pripojeny k 192.168.1.15:C:\Dochadzka.NET\DOCHADZKA.GDB');
     btnConnectDB.Caption := 'Pripojeny';
+    try
+      if PeppolEASNeedsUpdate(FDBConn) then
+      begin
+        Log('Aktualizujem Peppol EAS codelist...');
+        if UpdatePeppolEAS(FDBConn, Updated) then
+          Log('Peppol EAS: aktualizovanych ' + IntToStr(Updated) + ' schem.')
+        else
+          Log('Peppol EAS: aktualizacia zlyhala.');
+      end
+      else
+        Log('Peppol EAS: codelist je aktualny.');
+    except
+      on E: Exception do
+        Log('Peppol EAS warning: ' + E.ClassName + ': ' + E.Message);
+    end;
   except
     on E: Exception do
     begin
