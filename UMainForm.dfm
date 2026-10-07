@@ -118,42 +118,6 @@ object FormMain: TFormMain
     TabOrder = 8
     OnClick = btnUseProductionClick
   end
-  object btnAuthenticate: TButton
-    Left = 610
-    Top = 70
-    Width = 95
-    Height = 25
-    Caption = 'Autentifikovať'
-    TabOrder = 9
-    OnClick = btnAuthenticateClick
-  end
-  object btnTokenStatus: TButton
-    Left = 710
-    Top = 70
-    Width = 75
-    Height = 25
-    Caption = 'Token stav'
-    TabOrder = 10
-    OnClick = btnTokenStatusClick
-  end
-  object btnRenewToken: TButton
-    Left = 790
-    Top = 70
-    Width = 85
-    Height = 25
-    Caption = 'Renew'
-    TabOrder = 11
-    OnClick = btnRenewTokenClick
-  end
-  object btnRevokeToken: TButton
-    Left = 610
-    Top = 100
-    Width = 95
-    Height = 25
-    Caption = 'Revoke'
-    TabOrder = 12
-    OnClick = btnRevokeTokenClick
-  end
 
   object lblDBConn: TLabel
     Left = 10
@@ -174,7 +138,7 @@ object FormMain: TFormMain
     Width = 100
     Height = 25
     Caption = 'Znovu pripojit'
-    TabOrder = 13
+    TabOrder = 9
     OnClick = btnConnectDBClick
   end
 
@@ -191,7 +155,7 @@ object FormMain: TFormMain
     Width = 400
     Height = 21
     Style = csDropDownList
-    TabOrder = 14
+    TabOrder = 10
   end
   object btnLoadInvoices: TButton
     Left = 500
@@ -199,7 +163,7 @@ object FormMain: TFormMain
     Width = 160
     Height = 25
     Caption = 'Nacitaj faktury (FV)'
-    TabOrder = 15
+    TabOrder = 11
     OnClick = btnLoadInvoicesClick
   end
 
@@ -211,7 +175,7 @@ object FormMain: TFormMain
     Columns = <>
     ReadOnly = True
     RowSelect = True
-    TabOrder = 16
+    TabOrder = 12
     ViewStyle = vsReport
     OnDblClick = btnLoadFromDBClick
   end
@@ -228,7 +192,7 @@ object FormMain: TFormMain
     Font.Name = 'MS Sans Serif'
     Font.Style = [fsBold]
     ParentFont = False
-    TabOrder = 17
+    TabOrder = 13
     OnClick = btnLoadFromDBClick
   end
 
@@ -244,7 +208,7 @@ object FormMain: TFormMain
     Top = 415
     Width = 600
     Height = 21
-    TabOrder = 18
+    TabOrder = 14
   end
   object btnBrowseXML: TButton
     Left = 618
@@ -252,7 +216,7 @@ object FormMain: TFormMain
     Width = 100
     Height = 25
     Caption = 'Prehlad...'
-    TabOrder = 19
+    TabOrder = 15
     OnClick = btnBrowseXMLClick
   end
   object Label6: TLabel
@@ -267,7 +231,7 @@ object FormMain: TFormMain
     Top = 447
     Width = 250
     Height = 21
-    TabOrder = 20
+    TabOrder = 16
   end
   object btnSend: TButton
     Left = 618
@@ -281,23 +245,8 @@ object FormMain: TFormMain
     Font.Name = 'MS Sans Serif'
     Font.Style = [fsBold]
     ParentFont = False
-    TabOrder = 21
+    TabOrder = 17
     OnClick = btnSendClick
-  end
-  object btnValidateXML: TButton
-    Left = 728
-    Top = 445
-    Width = 147
-    Height = 25
-    Caption = 'VALIDOVAŤ UBL'
-    Font.Charset = DEFAULT_CHARSET
-    Font.Color = clWindowText
-    Font.Height = -11
-    Font.Name = 'MS Sans Serif'
-    Font.Style = [fsBold]
-    ParentFont = False
-    TabOrder = 29
-    OnClick = btnValidateXMLClick
   end
 
   object Label7: TLabel
@@ -316,7 +265,7 @@ object FormMain: TFormMain
     MultiSelect = True
     ReadOnly = True
     RowSelect = True
-    TabOrder = 22
+    TabOrder = 18
     ViewStyle = vsReport
   end
   object Label8: TLabel
@@ -331,7 +280,7 @@ object FormMain: TFormMain
     Top = 665
     Width = 420
     Height = 21
-    TabOrder = 23
+    TabOrder = 19
   end
   object btnBrowseFolder: TButton
     Left = 558
@@ -339,7 +288,7 @@ object FormMain: TFormMain
     Width = 100
     Height = 25
     Caption = 'Prehlad...'
-    TabOrder = 24
+    TabOrder = 20
     OnClick = btnBrowseFolderClick
   end
   object btnCheckInbox: TButton
@@ -348,7 +297,7 @@ object FormMain: TFormMain
     Width = 130
     Height = 28
     Caption = 'Skontrolovat inbox'
-    TabOrder = 25
+    TabOrder = 21
     OnClick = btnCheckInboxClick
   end
   object btnDownloadSelected: TButton
@@ -357,7 +306,7 @@ object FormMain: TFormMain
     Width = 150
     Height = 28
     Caption = 'Stiahnut vybrany'
-    TabOrder = 26
+    TabOrder = 22
     OnClick = btnDownloadSelectedClick
   end
   object btnAcknowledgeSelected: TButton
@@ -366,7 +315,7 @@ object FormMain: TFormMain
     Width = 160
     Height = 28
     Caption = 'Potvrdit vsetky vybrate'
-    TabOrder = 27
+    TabOrder = 23
     OnClick = btnAcknowledgeSelectedClick
   end
   object memLog: TMemo
@@ -382,7 +331,7 @@ object FormMain: TFormMain
     ParentFont = False
     ReadOnly = True
     ScrollBars = ssVertical
-    TabOrder = 28
+    TabOrder = 24
     WordWrap = False
   end
   object dlgOpenXML: TOpenDialog
