@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
   StdCtrls, ComCtrls, ExtCtrls, IniFiles, FileCtrl, DB, ADODB,
-  EpostakClient, EpostakDemoCreds, EpostakPeppolValidator;
+  EpostakClient, EpostakDemoCreds;
 
 type
   TFARiadok = record
@@ -42,11 +42,6 @@ type
     btnSaveConfig: TButton;
     btnUseFirmA: TButton;
     btnUseFirmB: TButton;
-    btnAuthenticate: TButton;
-    btnTokenStatus: TButton;
-    btnRenewToken: TButton;
-    btnRevokeToken: TButton;
-    btnValidateXML: TButton;
     edtXMLFile: TEdit;
     btnBrowseXML: TButton;
     edtReceiverId: TEdit;
@@ -83,11 +78,6 @@ type
     procedure btnConnectDBClick(Sender: TObject);
     procedure btnLoadInvoicesClick(Sender: TObject);
     procedure btnLoadFromDBClick(Sender: TObject);
-    procedure btnAuthenticateClick(Sender: TObject);
-    procedure btnTokenStatusClick(Sender: TObject);
-    procedure btnRenewTokenClick(Sender: TObject);
-    procedure btnRevokeTokenClick(Sender: TObject);
-    procedure btnValidateXMLClick(Sender: TObject);
   private
     FClient:     TEpostakClient;
     FInboxItems: TEpostakDocumentListResult;
@@ -690,129 +680,6 @@ begin
   Log('URL: Produkcia — uistite sa ze mate produkcne credentials.');
 end;
 
-procedure TFormMain.btnAuthenticateClick(Sender: TObject);
-var
-  Client: TEpostakClient;
-begin
-  try
-    Client := MakeClient;
-    Log('Autentifikujem sa...');
-    Client.Authenticate;
-    Log('OK: access token získaný.');
-  except
-    on E: Exception do Log('CHYBA autentifikácie: ' + E.Message);
-  end;
-end;
-
-procedure TFormMain.btnTokenStatusClick(Sender: TObject);
-var
-  Client: TEpostakClient;
-begin
-  try
-    Client := MakeClient;
-    if Client.TokenStatus then
-      Log('OK: access token je platný.')
-    else
-      Log('TOKEN: nie je dostupný alebo už nie je platný.');
-  except
-    on E: Exception do Log('CHYBA TokenStatus: ' + E.Message);
-  end;
-end;
-
-procedure TFormMain.btnRenewTokenClick(Sender: TObject);
-var
-  Client: TEpostakClient;
-begin
-  try
-    Client := MakeClient;
-    Log('Obnovujem token...');
-    Client.RenewToken;
-    Log('OK: token obnovený.');
-  except
-    on E: Exception do Log('CHYBA RenewToken: ' + E.Message);
-  end;
-end;
-
-procedure TFormMain.btnRevokeTokenClick(Sender: TObject);
-var
-  Client: TEpostakClient;
-begin
-  try
-    Client := MakeClient;
-    Log('Ruším aktuálny token...');
-    Client.RevokeToken;
-    Log('OK: token zrušený.');
-  except
-    on E: Exception do Log('CHYBA RevokeToken: ' + E.Message);
-  end;
-end;
-
-procedure TFormMain.btnValidateXMLClick(Sender: TObject);
-var
-  UblXml: string;
-  R: TPeppolValidationResult;
-  I: Integer;
-begin
-  UblXml := FLastXML;
-  if UblXml <> '' then
-    Log('Validujem XML z InTime DB...')
-  else if Trim(edtXMLFile.Text) <> '' then
-  begin
-    if not FileExists(edtXMLFile.Text) then
-    begin
-      Log('CHYBA: XML súbor neexistuje.');
-      Exit;
-    end;
-    UblXml := LoadRawBytesFromFile(edtXMLFile.Text);
-    Log('Validujem XML zo súboru: ' + edtXMLFile.Text);
-  end
-  else
-  begin
-    Log('CHYBA: Najprv načítajte faktúru z DB alebo vyberte XML súbor.');
-    Exit;
-  end;
-
-  if Trim(UblXml) = '' then
-  begin
-    Log('CHYBA: XML je prázdne.');
-    Exit;
-  end;
-
-  if not PeppolValidatorAvailable then
-  begin
-    Log('CHYBA: Peppol validator nie je dostupný.');
-    Log('Spustite build-validator.bat a skontrolujte Java 17+ a Maven.');
-    Exit;
-  end;
-
-  FillChar(R, SizeOf(R), 0);
-  try
-    if not ValidatePeppolXMLText(UblXml, R) then
-    begin
-      Log('CHYBA: Validator sa nepodarilo spustiť.');
-      for I := 0 to R.Errors.Count - 1 do
-        Log('  ' + R.Errors[I]);
-      Exit;
-    end;
-
-    if R.Valid then
-    begin
-      Log('OK: UBL/Peppol validácia prešla.');
-      if R.VES <> '' then
-        Log('  VES: ' + R.VES);
-    end
-    else
-    begin
-      Log('CHYBA: UBL/Peppol validácia NEPREŠLA.');
-      Log('  Chyby: ' + IntToStr(R.ErrorCount));
-      for I := 0 to R.Errors.Count - 1 do
-        Log('  ' + R.Errors[I]);
-    end;
-  finally
-    FreePeppolValidationResult(R);
-  end;
-end;
-
 procedure TFormMain.btnBrowseXMLClick(Sender: TObject);
 begin
   if dlgOpenXML.Execute then edtXMLFile.Text := dlgOpenXML.FileName;
@@ -977,8 +844,6 @@ procedure TFormMain.btnSendClick(Sender: TObject);
 var
   Client: TEpostakClient;
   UblXml, DocId: string;
-  ValidationResult: TPeppolValidationResult;
-  I: Integer;
 begin
   if Trim(edtBaseURL.Text) = '' then begin Log('CHYBA: Vyplnte Base URL.'); Exit; end;
   if Trim(edtParticipantId.Text) = '' then begin Log('CHYBA: Vyplnte Participant ID.'); Exit; end;
@@ -1004,37 +869,6 @@ begin
 
   if Trim(UblXml) = '' then begin Log('CHYBA: XML je prazdny.'); Exit; end;
 
-  if not PeppolValidatorAvailable then
-  begin
-    Log('CHYBA: Peppol validator nie je dostupny - odoslanie zablokovane.');
-    Log('Spustite build-validator.bat (Java 17+ a Maven).');
-    Exit;
-  end;
-
-  FillChar(ValidationResult, SizeOf(ValidationResult), 0);
-  try
-    if not ValidatePeppolXMLText(UblXml, ValidationResult) then
-    begin
-      Log('CHYBA: Peppol validator nevratil vysledok - odoslanie zablokovane.');
-      for I := 0 to ValidationResult.Errors.Count - 1 do
-        Log('  ' + ValidationResult.Errors[I]);
-      Exit;
-    end;
-
-    if not ValidationResult.Valid then
-    begin
-      Log('CHYBA: UBL/Peppol validacia NEPREŠLA - odoslanie zablokovane.');
-      Log('  Chyby: ' + IntToStr(ValidationResult.ErrorCount));
-      for I := 0 to ValidationResult.Errors.Count - 1 do
-        Log('  ' + ValidationResult.Errors[I]);
-      Exit;
-    end;
-
-    Log('OK: UBL/Peppol validacia prešla.');
-  finally
-    FreePeppolValidationResult(ValidationResult);
-  end;
-
   try
     Client := MakeClient;
   except
@@ -1054,7 +888,6 @@ begin
     );
     FLastXML := ''; // clear after successful send
     Log('OK — Faktura odoslana. DocumentId: ' + DocId);
-    if Client.TokenStatus then Log('Token je stále platný.');
   except
     on E: Exception do
     begin
