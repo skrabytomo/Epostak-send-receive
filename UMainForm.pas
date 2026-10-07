@@ -208,7 +208,10 @@ begin
 end;
 
 function TFormMain.FormatISODateTime(const AISO: string): string;
-var DT: TDateTime;
+var
+  DT: TDateTime;
+  TZInfo: TTimeZoneInformation;
+  OffsetMinutes: Integer;
 begin
   try
     DT := EncodeDate(
@@ -219,6 +222,14 @@ begin
       StrToIntDef(Copy(AISO, 12, 2), 0),
       StrToIntDef(Copy(AISO, 15, 2), 0),
       StrToIntDef(Copy(AISO, 18, 2), 0), 0);
+    // Convert UTC to local time
+    case GetTimeZoneInformation(TZInfo) of
+      TIME_ZONE_ID_STANDARD: OffsetMinutes := -TZInfo.Bias - TZInfo.StandardBias;
+      TIME_ZONE_ID_DAYLIGHT: OffsetMinutes := -TZInfo.Bias - TZInfo.DaylightBias;
+    else
+      OffsetMinutes := -TZInfo.Bias;
+    end;
+    DT := DT + OffsetMinutes / 1440.0;
     Result := FormatDateTime('dd.mm.yyyy hh:nn', DT);
   except
     Result := AISO;
