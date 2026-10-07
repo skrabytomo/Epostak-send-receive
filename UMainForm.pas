@@ -977,6 +977,8 @@ procedure TFormMain.btnSendClick(Sender: TObject);
 var
   Client: TEpostakClient;
   UblXml, DocId: string;
+  ValidationResult: TPeppolValidationResult;
+  I: Integer;
 begin
   if Trim(edtBaseURL.Text) = '' then begin Log('CHYBA: Vyplnte Base URL.'); Exit; end;
   if Trim(edtParticipantId.Text) = '' then begin Log('CHYBA: Vyplnte Participant ID.'); Exit; end;
@@ -1001,6 +1003,37 @@ begin
   end;
 
   if Trim(UblXml) = '' then begin Log('CHYBA: XML je prazdny.'); Exit; end;
+
+  if not PeppolValidatorAvailable then
+  begin
+    Log('CHYBA: Peppol validator nie je dostupny - odoslanie zablokovane.');
+    Log('Spustite build-validator.bat (Java 17+ a Maven).');
+    Exit;
+  end;
+
+  FillChar(ValidationResult, SizeOf(ValidationResult), 0);
+  try
+    if not ValidatePeppolXMLText(UblXml, ValidationResult) then
+    begin
+      Log('CHYBA: Peppol validator nevratil vysledok - odoslanie zablokovane.');
+      for I := 0 to ValidationResult.Errors.Count - 1 do
+        Log('  ' + ValidationResult.Errors[I]);
+      Exit;
+    end;
+
+    if not ValidationResult.Valid then
+    begin
+      Log('CHYBA: UBL/Peppol validacia NEPREŠLA - odoslanie zablokovane.');
+      Log('  Chyby: ' + IntToStr(ValidationResult.ErrorCount));
+      for I := 0 to ValidationResult.Errors.Count - 1 do
+        Log('  ' + ValidationResult.Errors[I]);
+      Exit;
+    end;
+
+    Log('OK: UBL/Peppol validacia prešla.');
+  finally
+    FreePeppolValidationResult(ValidationResult);
+  end;
 
   try
     Client := MakeClient;
