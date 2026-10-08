@@ -174,7 +174,7 @@ end;
 function UpdatePeppolEAS(AConn: TADOConnection; out AUpdatedCount: Integer; out ALastError: string): Boolean;
 var
   TempFile, SourceUrl, SourceVersion: string;
-  XML, Rows, Row, Root: OleVariant;
+  XML, Rows, Row, Root, FirstChild: OleVariant;
   I: Integer;
   SchemeId, Country, SchemeName, State, RemovalDate: string;
   Q: TADOQuery;
@@ -201,17 +201,18 @@ begin
     Root := XML.documentElement;
     if VarIsNull(Root) or VarIsEmpty(Root) then begin ALastError := 'XML root element is null'; Exit; end;
 
-    Rows := XML.selectNodes('//*[local-name()="Row"]');
-    if Rows.length = 0 then
-      Rows := XML.selectNodes('//Row');
-    if Rows.length = 0 then
-      Rows := XML.selectNodes('//*[local-name()="SimpleRow"]');
+    // Root is "participant-identifier-schemes", direct children are the scheme entries
+    Rows := Root.childNodes;
     if Rows.length = 0 then
     begin
-      ALastError := 'No Row elements found. Root: ' + VarToStr(Root.nodeName) +
-                    ' ChildCount: ' + IntToStr(Root.childNodes.length);
+      ALastError := 'No child elements found under root: ' + VarToStr(Root.nodeName);
       Exit;
     end;
+    // Log first child for structure diagnosis
+    FirstChild := Rows.item(0);
+    ALastError := 'First child: ' + VarToStr(FirstChild.nodeName) +
+                  ' attrs: ' + VarToStr(FirstChild.xml);
+    Exit; // temporary - remove after diagnosis
 
     SourceVersion := Trim(VarToStr(Root.getAttribute('version')));
     if SourceVersion = '' then SourceVersion := '9.7';
