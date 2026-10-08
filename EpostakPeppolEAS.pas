@@ -30,9 +30,6 @@ end;
 function DownloadFile(const AUrl, AFileName: string): Boolean;
 var
   HTTP: OleVariant;
-  Stream: OleVariant;
-  FS: TFileStream;
-  Data: string;
 begin
   Result := False;
   if Trim(AUrl) = '' then Exit;
@@ -43,55 +40,21 @@ begin
     HTTP.setOption(2, 13056); // SXH_OPTION_IGNORE_SERVER_SSL_CERT_ERROR_FLAGS
     HTTP.send(EmptyParam);
     if HTTP.status <> 200 then Exit;
-    // Save response to file
-    Stream := CreateOleObject('ADODB.Stream');
-    Stream.Type_ := 1; // adTypeBinary
-    Stream.Open(EmptyParam, 3, 4, EmptyParam, EmptyParam);
-    Stream.Write(HTTP.responseBody);
-    Stream.SaveToFile(AFileName, 2);
-    Stream.Close;
+    // Save responseText to file
+    with TStringList.Create do
+    try
+      Text := VarToStr(HTTP.responseText);
+      SaveToFile(AFileName);
+    finally
+      Free;
+    end;
     Result := True;
   except
     Result := False;
   end;
 end;
 
-function DownloadFile_unused(const AUrl, AFileName: string): Boolean;
-var
-  HInet, HUrl: HINTERNET;
-  Buf: array[0..8191] of Byte;
-  ReadBytes: DWORD;
-  FS: TFileStream;
-begin
-  Result := False;
-  if Trim(AUrl) = '' then Exit;
 
-  HInet := InternetOpen('EpostakPeppolEAS/2.1',
-    INTERNET_OPEN_TYPE_PRECONFIG, nil, nil, 0);
-  if HInet = nil then Exit;
-  try
-    HUrl := InternetOpenUrl(HInet, PChar(AUrl), nil, 0,
-      INTERNET_FLAG_RELOAD or INTERNET_FLAG_NO_CACHE_WRITE or INTERNET_FLAG_SECURE, 0);
-    if HUrl = nil then Exit;
-    try
-      FS := TFileStream.Create(AFileName, fmCreate);
-      try
-        repeat
-          ReadBytes := 0;
-          if not InternetReadFile(HUrl, @Buf[0], SizeOf(Buf), ReadBytes) then Exit;
-          if ReadBytes > 0 then FS.WriteBuffer(Buf[0], ReadBytes);
-        until ReadBytes = 0;
-        Result := FS.Size > 0;
-      finally
-        FS.Free;
-      end;
-    finally
-      InternetCloseHandle(HUrl);
-    end;
-  finally
-    InternetCloseHandle(HInet);
-  end;
-end;
 
 function NodeValueByColumn(ARow: OleVariant; const AColumnRef: string): string;
 var
