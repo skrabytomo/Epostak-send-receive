@@ -29,24 +29,32 @@ end;
 
 function DownloadFile(const AUrl, AFileName: string): Boolean;
 var
-  HTTP: OleVariant;
+  HTTP:    OleVariant;
+  Body:    OleVariant;
+  DataPtr: Pointer;
+  DataLen: Integer;
+  FS:      TFileStream;
 begin
   Result := False;
   if Trim(AUrl) = '' then Exit;
   try
-    // Use ServerXMLHTTP for better TLS 1.2 support vs WinInet
     HTTP := CreateOleObject('MSXML2.ServerXMLHTTP.6.0');
     HTTP.open('GET', AUrl, False);
-    HTTP.setOption(2, 13056); // SXH_OPTION_IGNORE_SERVER_SSL_CERT_ERROR_FLAGS
+    HTTP.setOption(2, 13056);
     HTTP.send(EmptyParam);
     if HTTP.status <> 200 then Exit;
-    // Save responseText to file
-    with TStringList.Create do
+    Body    := HTTP.responseBody;
+    DataLen := VarArrayHighBound(Body, 1) - VarArrayLowBound(Body, 1) + 1;
+    DataPtr := VarArrayLock(Body);
     try
-      Text := VarToStr(HTTP.responseText);
-      SaveToFile(AFileName);
+      FS := TFileStream.Create(AFileName, fmCreate);
+      try
+        FS.WriteBuffer(DataPtr^, DataLen);
+      finally
+        FS.Free;
+      end;
     finally
-      Free;
+      VarArrayUnlock(Body);
     end;
     Result := True;
   except
