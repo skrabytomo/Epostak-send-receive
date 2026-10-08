@@ -195,6 +195,24 @@ object FormMain: TFormMain
     TabOrder = 13
     OnClick = btnLoadFromDBClick
   end
+  object btnShowXML: TButton
+    Left = 220
+    Top = 358
+    Width = 130
+    Height = 25
+    Caption = 'Zobraz UBL XML'
+    TabOrder = 14
+    OnClick = btnShowXMLClick
+  end
+  object btnShowEAS: TButton
+    Left = 360
+    Top = 358
+    Width = 130
+    Height = 25
+    Caption = 'Zobraz EAS XML'
+    TabOrder = 15
+    OnClick = btnShowEASClick
+  end
 
   object Label5: TLabel
     Left = 10

@@ -4,7 +4,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
-  StdCtrls, ComCtrls, ExtCtrls, IniFiles, FileCtrl, DB, ADODB,
+  StdCtrls, ComCtrls, ExtCtrls, IniFiles, FileCtrl, ShellAPI, DB, ADODB,
   EpostakClient, EpostakDemoCreds, EpostakPeppolEAS;
 
 type
@@ -62,6 +62,8 @@ type
     btnLoadInvoices: TButton;
     lvInvoices: TListView;
     btnLoadFromDB: TButton;
+    btnShowXML: TButton;
+    btnShowEAS: TButton;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure btnSaveConfigClick(Sender: TObject);
@@ -78,6 +80,8 @@ type
     procedure btnConnectDBClick(Sender: TObject);
     procedure btnLoadInvoicesClick(Sender: TObject);
     procedure btnLoadFromDBClick(Sender: TObject);
+    procedure btnShowXMLClick(Sender: TObject);
+    procedure btnShowEASClick(Sender: TObject);
   private
     FClient:     TEpostakClient;
     FInboxItems: TEpostakDocumentListResult;
@@ -868,6 +872,47 @@ end;
 // ============================================================================
 // SEND
 // ============================================================================
+
+procedure TFormMain.btnShowXMLClick(Sender: TObject);
+var
+  TmpFile: string;
+begin
+  if FLastXML = '' then
+  begin
+    Log('Najprv nacitajte fakturu z DB.');
+    Exit;
+  end;
+  TmpFile := IncludeTrailingPathDelimiter(GetEnvironmentVariable('TEMP')) + 'epostak_invoice.xml';
+  with TStringList.Create do
+  try
+    Text := FLastXML;
+    SaveToFile(TmpFile);
+  finally
+    Free;
+  end;
+  ShellExecute(Handle, 'open', PChar(TmpFile), nil, nil, SW_SHOW);
+  Log('XML otvoreny v: ' + TmpFile);
+end;
+
+procedure TFormMain.btnShowEASClick(Sender: TObject);
+var
+  TmpFile: string;
+  Updated: Integer;
+  EASError: string;
+begin
+  Log('Sťahujem EAS XML...');
+  if UpdatePeppolEAS(FDBConn, Updated, EASError) then
+  begin
+    Log('EAS aktualizovany: ' + IntToStr(Updated) + ' schem.');
+    TmpFile := IncludeTrailingPathDelimiter(GetEnvironmentVariable('TEMP')) + 'peppol-eas-last.xml';
+    if FileExists(TmpFile) then
+      ShellExecute(Handle, 'open', PChar(TmpFile), nil, nil, SW_SHOW)
+    else
+      Log('Temp subor nebol najdeny: ' + TmpFile);
+  end
+  else
+    Log('EAS zlyhal: ' + EASError);
+end;
 
 procedure TFormMain.btnSendClick(Sender: TObject);
 var

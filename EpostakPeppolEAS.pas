@@ -200,8 +200,7 @@ begin
   if not TableExists(AConn) then begin ALastError := 'PEPPOL_EAS table not found'; Exit; end;
 
   SourceUrl := GetLatestEASUrl;
-  TempFile := IncludeTrailingPathDelimiter(GetEnvironmentVariable('TEMP')) +
-    Format('peppol-eas-%d.xml', [GetTickCount]);
+  TempFile := IncludeTrailingPathDelimiter(GetEnvironmentVariable('TEMP')) + 'peppol-eas-last.xml';
 
   if not DownloadFile(SourceUrl, TempFile) then begin ALastError := 'Download failed: ' + SourceUrl; Exit; end;
   try
