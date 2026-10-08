@@ -69,8 +69,17 @@ var
   Nodes, N: OleVariant;
   I: Integer;
   Ref: string;
+  AttrVal: OleVariant;
 begin
   Result := '';
+  // Try direct attribute first (e.g. <scheme iso6523="0245" country="SK" .../>)
+  AttrVal := ARow.getAttribute(AColumnRef);
+  if not VarIsNull(AttrVal) and not VarIsEmpty(AttrVal) then
+  begin
+    Result := Trim(VarToStr(AttrVal));
+    Exit;
+  end;
+  // Try GeneriCode Value/SimpleValue format
   Nodes := ARow.selectNodes('./*[local-name()="Value"]');
   for I := 0 to Nodes.length - 1 do
   begin
@@ -82,6 +91,10 @@ begin
       Exit;
     end;
   end;
+  // Try child element with matching local-name
+  Nodes := ARow.selectNodes('.//*[local-name()="' + AColumnRef + '"]');
+  if Nodes.length > 0 then
+    Result := Trim(VarToStr(Nodes.item(0).text));
 end;
 
 function TableExists(AConn: TADOConnection): Boolean;
@@ -208,12 +221,6 @@ begin
       ALastError := 'No child elements found under root: ' + VarToStr(Root.nodeName);
       Exit;
     end;
-    // Log first child for structure diagnosis
-    FirstChild := Rows.item(0);
-    ALastError := 'First child: ' + VarToStr(FirstChild.nodeName) +
-                  ' attrs: ' + VarToStr(FirstChild.xml);
-    Exit; // temporary - remove after diagnosis
-
     SourceVersion := Trim(VarToStr(Root.getAttribute('version')));
     if SourceVersion = '' then SourceVersion := '9.7';
 
