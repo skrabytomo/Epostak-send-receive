@@ -716,6 +716,7 @@ end;
 procedure TFormMain.ConnectDB;
 var
   Updated: Integer;
+  EASError: string;
 const
   DB_CONNSTR =
     'Driver={Firebird/InterBase(r) driver};' +
@@ -745,12 +746,10 @@ begin
       if PeppolEASNeedsUpdate(FDBConn) then
       begin
         Log('Aktualizujem Peppol EAS codelist...');
-        if UpdatePeppolEAS(FDBConn, Updated) then
+        if UpdatePeppolEAS(FDBConn, Updated, EASError) then
           Log('Peppol EAS: aktualizovanych ' + IntToStr(Updated) + ' schem.')
         else
-          Log('Peppol EAS: aktualizacia zlyhala - download alebo XML parse zlyhal. URL: ' +
-              'https://docs.peppol.eu/edelivery/codelists/v9.7/' +
-              'Peppol%20Code%20Lists%20-%20Participant%20identifier%20schemes%20v9.7.xml');
+          Log('Peppol EAS: aktualizacia zlyhala: ' + EASError);
       end
       else
         Log('Peppol EAS: codelist je aktualny.');

@@ -10,7 +10,7 @@ const
   PEPPOL_EAS_REFRESH_DAYS = 7;
 
 function EnsurePeppolEASTable(AConn: TADOConnection): Boolean;
-function UpdatePeppolEAS(AConn: TADOConnection; out AUpdatedCount: Integer): Boolean;
+function UpdatePeppolEAS(AConn: TADOConnection; out AUpdatedCount: Integer; out ALastError: string): Boolean;
 function PeppolEASNeedsUpdate(AConn: TADOConnection): Boolean;
 function PeppolEASIsActive(AConn: TADOConnection; const ASchemeId: string): Boolean;
 
@@ -163,7 +163,7 @@ begin
   Result := 'DATE ' + SQLQuote(FormatDateTime('yyyy-mm-dd', D));
 end;
 
-function UpdatePeppolEAS(AConn: TADOConnection; out AUpdatedCount: Integer): Boolean;
+function UpdatePeppolEAS(AConn: TADOConnection; out AUpdatedCount: Integer; out ALastError: string): Boolean;
 var
   TempFile, SourceUrl, SourceVersion: string;
   XML, Rows, Row, Root: OleVariant;
@@ -173,27 +173,28 @@ var
 begin
   Result := False;
   AUpdatedCount := 0;
+  ALastError := '';
 
-  if (AConn = nil) or not AConn.Connected then Exit;
-  if not TableExists(AConn) then Exit;
+  if (AConn = nil) or not AConn.Connected then begin ALastError := 'DB not connected'; Exit; end;
+  if not TableExists(AConn) then begin ALastError := 'PEPPOL_EAS table not found'; Exit; end;
 
   SourceUrl := GetLatestEASUrl;
   TempFile := IncludeTrailingPathDelimiter(GetEnvironmentVariable('TEMP')) +
     Format('peppol-eas-%d.xml', [GetTickCount]);
 
-  if not DownloadFile(SourceUrl, TempFile) then Exit;
+  if not DownloadFile(SourceUrl, TempFile) then begin ALastError := 'Download failed: ' + SourceUrl; Exit; end;
   try
     XML := CreateOleObject('MSXML2.DOMDocument.6.0');
     XML.async := False;
     XML.validateOnParse := False;
     XML.resolveExternals := False;
-    if not XML.load(TempFile) then Exit;
+    if not XML.load(TempFile) then begin ALastError := 'XML load failed: ' + VarToStr(XML.parseError.reason); Exit; end;
 
     Root := XML.documentElement;
-    if VarIsNull(Root) or VarIsEmpty(Root) then Exit;
+    if VarIsNull(Root) or VarIsEmpty(Root) then begin ALastError := 'XML root element is null'; Exit; end;
 
     Rows := XML.selectNodes('//*[local-name()="Row"]');
-    if Rows.length = 0 then Exit;
+    if Rows.length = 0 then begin ALastError := 'No Row elements found in XML'; Exit; end;
 
     SourceVersion := Trim(VarToStr(Root.getAttribute('version')));
     if SourceVersion = '' then SourceVersion := '9.7';
