@@ -202,7 +202,16 @@ begin
     if VarIsNull(Root) or VarIsEmpty(Root) then begin ALastError := 'XML root element is null'; Exit; end;
 
     Rows := XML.selectNodes('//*[local-name()="Row"]');
-    if Rows.length = 0 then begin ALastError := 'No Row elements found in XML'; Exit; end;
+    if Rows.length = 0 then
+      Rows := XML.selectNodes('//Row');
+    if Rows.length = 0 then
+      Rows := XML.selectNodes('//*[local-name()="SimpleRow"]');
+    if Rows.length = 0 then
+    begin
+      ALastError := 'No Row elements found. Root: ' + VarToStr(Root.nodeName) +
+                    ' ChildCount: ' + IntToStr(Root.childNodes.length);
+      Exit;
+    end;
 
     SourceVersion := Trim(VarToStr(Root.getAttribute('version')));
     if SourceVersion = '' then SourceVersion := '9.7';
