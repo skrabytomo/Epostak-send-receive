@@ -879,10 +879,10 @@ var
 begin
   if FLastXML = '' then
   begin
-    Log('Najprv nacitajte fakturu z DB.');
+    Log('Najprv nacitajte a pripravte fakturu z DB.');
     Exit;
   end;
-  TmpFile := IncludeTrailingPathDelimiter(GetEnvironmentVariable('TEMP')) + 'epostak_invoice.xml';
+  TmpFile := IncludeTrailingPathDelimiter(GetEnvironmentVariable('TEMP')) + 'epostak_invoice_preview.xml';
   with TStringList.Create do
   try
     Text := FLastXML;
@@ -891,27 +891,35 @@ begin
     Free;
   end;
   ShellExecute(Handle, 'open', PChar(TmpFile), nil, nil, SW_SHOW);
-  Log('XML otvoreny v: ' + TmpFile);
 end;
 
 procedure TFormMain.btnShowEASClick(Sender: TObject);
 var
-  TmpFile: string;
-  Updated: Integer;
-  EASError: string;
+  DocId: string;
+  XML:   string;
+  SavePath: string;
 begin
-  Log('Sťahujem EAS XML...');
-  if UpdatePeppolEAS(FDBConn, Updated, EASError) then
+  DocId := GetSelectedDocId;
+  if DocId = '' then
   begin
-    Log('EAS aktualizovany: ' + IntToStr(Updated) + ' schem.');
-    TmpFile := IncludeTrailingPathDelimiter(GetEnvironmentVariable('TEMP')) + 'peppol-eas-last.xml';
-    if FileExists(TmpFile) then
-      ShellExecute(Handle, 'open', PChar(TmpFile), nil, nil, SW_SHOW)
-    else
-      Log('Temp subor nebol najdeny: ' + TmpFile);
-  end
-  else
-    Log('EAS zlyhal: ' + EASError);
+    Log('Vyberte dokument z inboxu.');
+    Exit;
+  end;
+  try
+    XML := MakeClient.GetDocumentXML(DocId);
+    SavePath := IncludeTrailingPathDelimiter(GetEnvironmentVariable('TEMP')) + DocId + '.xml';
+    with TStringList.Create do
+    try
+      Text := XML;
+      SaveToFile(SavePath);
+    finally
+      Free;
+    end;
+    ShellExecute(Handle, 'open', PChar(SavePath), nil, nil, SW_SHOW);
+    Log('Prijaty XML otvoreny: ' + SavePath);
+  except
+    on E: Exception do Log('CHYBA: ' + E.Message);
+  end;
 end;
 
 procedure TFormMain.btnSendClick(Sender: TObject);

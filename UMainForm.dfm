@@ -200,7 +200,7 @@ object FormMain: TFormMain
     Top = 358
     Width = 130
     Height = 25
-    Caption = 'Zobraz UBL XML'
+    Caption = 'Zobraz XML faktury'
     TabOrder = 14
     OnClick = btnShowXMLClick
   end
@@ -209,7 +209,7 @@ object FormMain: TFormMain
     Top = 358
     Width = 130
     Height = 25
-    Caption = 'Zobraz EAS XML'
+    Caption = 'Zobraz prijaty XML'
     TabOrder = 15
     OnClick = btnShowEASClick
   end

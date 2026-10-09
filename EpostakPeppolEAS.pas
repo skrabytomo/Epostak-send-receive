@@ -187,7 +187,7 @@ end;
 function UpdatePeppolEAS(AConn: TADOConnection; out AUpdatedCount: Integer; out ALastError: string): Boolean;
 var
   TempFile, SourceUrl, SourceVersion: string;
-  XML, Rows, Row, Root, FirstChild: OleVariant;
+  XML, Rows, Row, Root: OleVariant;
   I: Integer;
   SchemeId, Country, SchemeName, State, RemovalDate: string;
   Q: TADOQuery;
