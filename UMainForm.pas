@@ -882,7 +882,7 @@ begin
     Log('Najprv nacitajte a pripravte fakturu z DB.');
     Exit;
   end;
-  TmpFile := IncludeTrailingPathDelimiter(GetEnvironmentVariable('TEMP')) + 'epostak_invoice_preview.xml';
+  TmpFile := GetEnvironmentVariable('TEMP') + '\' + 'epostak_invoice_preview.xml';
   with TStringList.Create do
   try
     Text := FLastXML;
@@ -907,7 +907,7 @@ begin
   end;
   try
     XML := MakeClient.GetDocumentXML(DocId);
-    SavePath := IncludeTrailingPathDelimiter(GetEnvironmentVariable('TEMP')) + DocId + '.xml';
+    SavePath := GetEnvironmentVariable('TEMP') + '\' + DocId + '.xml';
     with TStringList.Create do
     try
       Text := XML;
@@ -1015,7 +1015,7 @@ begin
   if DocId = '' then begin Log('Vyberte dokument.'); Exit; end;
   try Client := MakeClient; except on E: Exception do begin Log('CHYBA: ' + E.Message); Exit; end; end;
   ForceDirectories(edtSaveFolder.Text);
-  SavePath := IncludeTrailingBackslash(edtSaveFolder.Text) + DocId + '.xml';
+  SavePath := edtSaveFolder.Text + '\' + DocId + '.xml';
   Log('Stahujem ' + DocId + '...');
   try
     XML := Client.GetDocumentXML(DocId);
