@@ -1,0 +1,7 @@
+*.exe
+*.dcu
+*.dof
+*.cfg
+*.~*
+*.local
+__history/
